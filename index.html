@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vote-icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FHEVOTE - Confidential Voting DApp</title>
+    <meta name="description" content="Create and participate in confidential polls using Zama's FHE technology" />
+    
+    <!-- CRITICAL: Load FHEVM Relayer SDK v0.3.0+ from CDN BEFORE React app loads -->
+    <!-- This must be loaded first so window.fhevm is available -->
+    <script 
+      src="https://cdn.zama.ai/relayer-sdk-js/0.3.0/relayer-sdk-js.umd.cjs" 
+      type="text/javascript"
+    ></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
