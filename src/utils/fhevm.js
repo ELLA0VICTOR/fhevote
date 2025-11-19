@@ -16,7 +16,7 @@ let isInitialized = false;
 /**
  * FHEVM v0.9 Sepolia Configuration (VERIFIED CORRECT)
  * Source: https://docs.zama.ai/protocol/solidity-guides/smart-contract/configure/contract_addresses
- * Confirmed by Zama Discord mod 2025
+ * 
  */
 const SEPOLIA_V09_CONFIG = {
   // ACL_CONTRACT_ADDRESS (FHEVM Host chain - Sepolia)
