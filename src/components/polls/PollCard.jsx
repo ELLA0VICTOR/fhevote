@@ -24,6 +24,11 @@ export const PollCard = ({ poll }) => {
     return `${minutes}m left`;
   };
 
+  // Check both isActive flag AND time-based expiry
+  const now = Date.now() / 1000;
+  const isPollExpired = now >= poll.endTime;
+  const isActuallyActive = poll.isActive && !isPollExpired;
+
   const totalVotes = poll.finalResults 
     ? poll.finalResults.reduce((sum, v) => sum + v, 0)
     : 0;
@@ -33,8 +38,8 @@ export const PollCard = ({ poll }) => {
       <CardHeader>
         <div className="flex justify-between items-start gap-4">
           <CardTitle className="text-xl">{poll.question}</CardTitle>
-          <Badge variant={poll.isActive ? 'default' : 'secondary'}>
-            {poll.isActive ? 'Active' : 'Closed'}
+          <Badge variant={isActuallyActive ? 'default' : 'secondary'}>
+            {isActuallyActive ? 'Active' : 'Ended'}
           </Badge>
         </div>
         <CardDescription>
@@ -65,7 +70,11 @@ export const PollCard = ({ poll }) => {
           onClick={() => navigate(`/poll/${poll.id}`)}
           className="w-full"
         >
-          {poll.finalResults ? 'View Results' : 'Vote Now'}
+          {poll.finalResults && poll.finalResults.length > 0 
+            ? 'View Results' 
+            : isActuallyActive 
+              ? 'Vote Now' 
+              : 'View Poll'}
         </Button>
       </CardFooter>
     </Card>

@@ -9,19 +9,20 @@ import { VoteModal } from '../components/polls/VoteModal';
 import { ResultsDisplay } from '../components/polls/ResultsDisplay';
 import { LoadingSpinner } from '../components/retroui/common/LoadingSpinner';
 import { toast } from 'sonner';
-import { ArrowLeft, Clock, User } from 'lucide-react';
+import { ArrowLeft, Clock, User, Trash2 } from 'lucide-react';
 
 export const PollDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { account, signer } = useWalletContext();
   const contractHook = useContract(signer);
-  const { contract, getPoll, vote, hasVoted, closePoll, decryptAndSubmitResults } = contractHook;
+  const { contract, getPoll, vote, hasVoted, closePoll, deletePoll, decryptAndSubmitResults } = contractHook;
 
   const [poll, setPoll] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userHasVoted, setUserHasVoted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const fetchPollData = async () => {
     // Don't fetch if contract not ready
@@ -53,7 +54,7 @@ export const PollDetail = () => {
         creator: pollData.creator,
         endTime: Number(pollData.endTime),
         isActive: pollData.isActive,
-        finalResults: [] // Will be fetched separately if needed
+        finalResults: pollData.finalResults || []
       });
       
       setUserHasVoted(voted);
@@ -78,6 +79,18 @@ export const PollDetail = () => {
       return;
     }
 
+    // CRITICAL: Validate poll is still active and not expired
+    const now = Date.now() / 1000;
+    if (now >= poll.endTime) {
+      toast.error('This poll has ended. No more votes accepted.');
+      return;
+    }
+
+    if (!poll.isActive) {
+      toast.error('This poll is closed. No more votes accepted.');
+      return;
+    }
+
     try {
       await vote(id, optionIndex, account);
       setUserHasVoted(true);
@@ -85,7 +98,7 @@ export const PollDetail = () => {
       setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Vote failed:', error);
-      // Don't show toast here - VoteModal already handles it
+      // Error toast already handled by VoteModal
     }
   };
 
@@ -98,11 +111,28 @@ export const PollDetail = () => {
     const toastId = toast.loading('Closing poll...');
     try {
       await closePoll(id);
-      toast.success('Poll closed!', { id: toastId });
+      toast.success('Poll closed! You can now decrypt results.', { id: toastId });
       setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Close poll failed:', error);
       toast.error('Failed to close poll: ' + error.message, { id: toastId });
+    }
+  };
+
+  const handleDeletePoll = async () => {
+    if (!contract) {
+      toast.error('Contract not ready, please refresh');
+      return;
+    }
+
+    const toastId = toast.loading('Deleting poll...');
+    try {
+      await deletePoll(id);
+      toast.success('Poll deleted successfully!', { id: toastId });
+      navigate('/');
+    } catch (error) {
+      console.error('Delete poll failed:', error);
+      toast.error('Failed to delete poll: ' + error.message, { id: toastId });
     }
   };
 
@@ -117,7 +147,7 @@ export const PollDetail = () => {
       setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Decryption failed:', error);
-      // Don't show toast here - ResultsDisplay already handles it
+      // Error toast already handled by ResultsDisplay
     }
   };
 
@@ -148,11 +178,12 @@ export const PollDetail = () => {
     );
   }
 
-  const isPollEnded = Date.now() / 1000 >= poll.endTime;
+  // Calculate if poll has truly ended (time-based)
+  const now = Date.now() / 1000;
+  const isPollExpired = now >= poll.endTime;
   const isCreator = account && account.toLowerCase() === poll.creator.toLowerCase();
 
   const timeRemaining = () => {
-    const now = Date.now() / 1000;
     const diff = poll.endTime - now;
 
     if (diff <= 0) return 'Poll ended';
@@ -187,9 +218,24 @@ export const PollDetail = () => {
                 {poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}
               </CardDescription>
             </div>
-            <Badge variant={poll.isActive ? 'default' : 'secondary'}>
-              {poll.isActive ? 'Active' : 'Closed'}
-            </Badge>
+            <div className="flex gap-2 items-center">
+              <Badge variant={poll.isActive && !isPollExpired ? 'default' : 'secondary'}>
+                {poll.isActive && !isPollExpired ? 'Active' : 'Ended'}
+              </Badge>
+              
+              {/* Delete Button (Creator Only) */}
+              {isCreator && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-1"
+                >
+                  <Trash2 size={16} />
+                  Delete
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -200,9 +246,35 @@ export const PollDetail = () => {
         </CardContent>
       </Card>
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <Card className="mb-8 border-destructive">
+          <CardContent className="p-6">
+            <h3 className="font-head text-xl mb-2">Delete Poll?</h3>
+            <p className="text-muted-foreground mb-4">
+              This action cannot be undone. All votes will be permanently deleted.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="destructive"
+                onClick={handleDeletePoll}
+              >
+                Yes, Delete Poll
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="space-y-6">
-        {/* Vote Section */}
-        {poll.isActive && !isPollEnded && (
+        {/* Vote Section - Only show if poll is active AND not expired */}
+        {poll.isActive && !isPollExpired && (
           <VoteModal
             poll={poll}
             onVote={handleVote}
@@ -211,16 +283,16 @@ export const PollDetail = () => {
           />
         )}
 
-        {/* Close Poll Button (Creator Only) */}
-        {isCreator && isPollEnded && poll.isActive && (
+        {/* Close Poll Button (Creator Only) - Show if expired but still marked active */}
+        {isCreator && isPollExpired && poll.isActive && (
           <Card className="bg-accent">
             <CardContent className="p-6">
-              <p className="font-medium mb-4">Poll has ended - Close to decrypt results</p>
+              <p className="font-medium mb-4">Poll has ended - Close to prepare for decryption</p>
               <Button
                 onClick={handleClosePoll}
                 className="w-full"
               >
-                Close Poll & Prepare Decryption
+                Close Poll & Mark for Decryption
               </Button>
             </CardContent>
           </Card>

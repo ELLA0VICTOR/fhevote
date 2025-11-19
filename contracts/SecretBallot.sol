@@ -14,6 +14,7 @@ contract SecretBallot is ZamaEthereumConfig {
         uint256 endTime;
         bool isActive;
         uint256[] finalResults;
+        bool exists; // NEW: Track if poll exists
     }
     
     mapping(uint => Poll) public polls;
@@ -23,6 +24,7 @@ contract SecretBallot is ZamaEthereumConfig {
     event VoteCast(uint indexed pollId, address indexed voter);
     event PollClosed(uint indexed pollId);
     event ResultsSubmitted(uint indexed pollId, uint256[] results);
+    event PollDeleted(uint indexed pollId, address indexed creator); // NEW EVENT
     
     function createPoll(
         string memory question,
@@ -39,6 +41,7 @@ contract SecretBallot is ZamaEthereumConfig {
         poll.creator = msg.sender;
         poll.endTime = block.timestamp + (durationHours * 1 hours);
         poll.isActive = true;
+        poll.exists = true; // NEW: Mark as existing
         
         // Initialize encrypted vote counts to zero
         for (uint i = 0; i < options.length; i++) {
@@ -56,6 +59,7 @@ contract SecretBallot is ZamaEthereumConfig {
         bytes calldata inputProof
     ) external {
         Poll storage poll = polls[pollId];
+        require(poll.exists, "Poll does not exist"); // NEW: Check existence
         require(poll.isActive, "Poll not active");
         require(block.timestamp < poll.endTime, "Poll ended");
         require(!poll.hasVoted[msg.sender], "Already voted");
@@ -84,6 +88,7 @@ contract SecretBallot is ZamaEthereumConfig {
     
     function closePoll(uint pollId) external {
         Poll storage poll = polls[pollId];
+        require(poll.exists, "Poll does not exist"); // NEW: Check existence
         require(msg.sender == poll.creator, "Only creator can close");
         require(block.timestamp >= poll.endTime, "Poll not ended yet");
         require(poll.isActive, "Already closed");
@@ -97,12 +102,26 @@ contract SecretBallot is ZamaEthereumConfig {
         emit PollClosed(pollId);
     }
     
+    // NEW: Delete poll function
+    function deletePoll(uint pollId) external {
+        Poll storage poll = polls[pollId];
+        require(poll.exists, "Poll does not exist");
+        require(msg.sender == poll.creator, "Only creator can delete");
+        
+        // Mark poll as deleted
+        poll.exists = false;
+        poll.isActive = false;
+        
+        emit PollDeleted(pollId, msg.sender);
+    }
+    
     function submitResults(
         uint pollId,
         uint256[] memory decryptedResults,
         bytes memory proof
     ) external {
         Poll storage poll = polls[pollId];
+        require(poll.exists, "Poll does not exist"); // NEW: Check existence
         require(!poll.isActive, "Poll still active");
         require(poll.finalResults.length == 0, "Results already submitted");
         require(decryptedResults.length == poll.options.length, "Invalid results length");
@@ -130,38 +149,51 @@ contract SecretBallot is ZamaEthereumConfig {
         bool isActive
     ) {
         Poll storage poll = polls[pollId];
+        require(poll.exists, "Poll does not exist"); // NEW: Check existence
         return (poll.question, poll.options, poll.creator, poll.endTime, poll.isActive);
     }
     
     function getVoteCount(uint pollId, uint optionIndex) external view returns (bytes32) {
+        require(polls[pollId].exists, "Poll does not exist"); // NEW: Check existence
         require(optionIndex < polls[pollId].options.length, "Invalid option");
         // Return as bytes32 handle for decryption
         return FHE.toBytes32(polls[pollId].voteCounts[optionIndex]);
     }
     
     function getFinalResults(uint pollId) external view returns (uint256[] memory) {
+        require(polls[pollId].exists, "Poll does not exist"); // NEW: Check existence
         return polls[pollId].finalResults;
     }
     
     function hasVoted(uint pollId, address voter) external view returns (bool) {
+        require(polls[pollId].exists, "Poll does not exist"); // NEW: Check existence
         return polls[pollId].hasVoted[voter];
     }
     
     function getActivePollIds() external view returns (uint[] memory) {
         uint activeCount = 0;
         for (uint i = 0; i < pollCount; i++) {
-            if (polls[i].isActive) activeCount++;
+            // NEW: Check exists flag
+            if (polls[i].exists && polls[i].isActive && block.timestamp < polls[i].endTime) {
+                activeCount++;
+            }
         }
         
         uint[] memory activeIds = new uint[](activeCount);
         uint index = 0;
         for (uint i = 0; i < pollCount; i++) {
-            if (polls[i].isActive) {
+            // NEW: Check exists flag and time-based expiry
+            if (polls[i].exists && polls[i].isActive && block.timestamp < polls[i].endTime) {
                 activeIds[index] = i;
                 index++;
             }
         }
         
         return activeIds;
+    }
+    
+    // NEW: Helper to check if poll exists
+    function pollExists(uint pollId) external view returns (bool) {
+        return polls[pollId].exists;
     }
 }

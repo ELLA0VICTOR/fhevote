@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getContract } from '../utils/contract';
-import { encryptVote, getFhevmInstance } from '../utils/fhevm';
+import { encryptVote, isSDKInitialized } from '../utils/fhevm';
 import { 
   decryptPollResults, 
   formatDecryptedResults, 
@@ -45,10 +45,15 @@ export function useContract(signer) {
   };
 
   /**
-   * Cast encrypted vote
+   * Cast encrypted vote with FHEVM validation
    */
   const vote = async (pollId, optionIndex, userAddress) => {
     if (!contract) throw new Error('Contract not initialized');
+    
+    // CRITICAL: Check FHEVM is initialized before attempting to vote
+    if (!isSDKInitialized()) {
+      throw new Error('FHEVM SDK not initialized. Please refresh the page.');
+    }
     
     console.log('🗳️ Casting vote...', { pollId, optionIndex, userAddress });
     
@@ -89,6 +94,29 @@ export function useContract(signer) {
     
     console.log('✅ Poll closed - ciphertexts marked for public decryption');
     return receipt;
+  };
+
+  /**
+   * Delete poll (creator only)
+   */
+  const deletePoll = async (pollId) => {
+    if (!contract) throw new Error('Contract not initialized');
+    
+    console.log('🗑️ Deleting poll...', pollId);
+    
+    try {
+      const tx = await contract.deletePoll(pollId);
+      const receipt = await tx.wait();
+      
+      console.log('✅ Poll deleted successfully');
+      return receipt;
+    } catch (error) {
+      // If deletePoll doesn't exist on contract, provide helpful error
+      if (error.message.includes('is not a function')) {
+        throw new Error('Delete functionality not available in contract. Please contact developer.');
+      }
+      throw error;
+    }
   };
 
   /**
@@ -232,6 +260,7 @@ export function useContract(signer) {
     createPoll,
     vote,
     closePoll,
+    deletePoll,
     getPoll,
     hasVoted,
     getFinalResults,

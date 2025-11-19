@@ -14,6 +14,18 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
       return;
     }
 
+    // CRITICAL: Double-check poll hasn't expired before submitting
+    const now = Date.now() / 1000;
+    if (now >= poll.endTime) {
+      toast.error('This poll has ended while you were voting');
+      return;
+    }
+
+    if (!poll.isActive) {
+      toast.error('This poll is closed');
+      return;
+    }
+
     setIsVoting(true);
     const toastId = toast.loading('Encrypting your vote...');
 
@@ -28,7 +40,9 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
     }
   };
 
-  const isPollEnded = Date.now() / 1000 >= poll.endTime;
+  // Check both isActive flag AND time-based expiry
+  const now = Date.now() / 1000;
+  const isPollExpired = now >= poll.endTime;
 
   if (hasVoted) {
     return (
@@ -43,13 +57,15 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
     );
   }
 
-  if (isPollEnded) {
+  if (isPollExpired || !poll.isActive) {
     return (
       <Card className="bg-muted">
         <CardContent className="p-6 text-center">
           <p className="font-medium">This poll has ended</p>
           <p className="text-sm text-muted-foreground mt-2">
-            Waiting for creator to reveal results
+            {poll.isActive 
+              ? 'Waiting for creator to close and reveal results'
+              : 'Waiting for results decryption'}
           </p>
         </CardContent>
       </Card>
@@ -85,6 +101,11 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
         >
           {isVoting ? 'Casting Vote...' : 'Cast Vote'}
         </Button>
+        {!account && (
+          <p className="text-sm text-muted-foreground text-center w-full mt-2">
+            Please connect your wallet to vote
+          </p>
+        )}
       </CardFooter>
     </Card>
   );

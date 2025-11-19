@@ -1,22 +1,22 @@
 /**
- * FHEVM v0.9 Initialization with @zama-fhe/relayer-sdk v0.3.0-5+ (CDN Bundle)
+ * FHEVM v0.9 Initialization with @zama-fhe/relayer-sdk v0.3.0-5 (CDN)
  * 
- * Using CDN bundle to avoid npm package resolution issues
- * Per docs: https://docs.zama.org/protocol/relayer-sdk-guides/development-guide/webapp
+ * Using CDN bundle approach for web apps per Discord mod recommendation
+ * CDN URL: https://cdn.zama.org/relayer-sdk-js/0.3.0-5/relayer-sdk-js.umd.cjs
  * 
  * CRITICAL WORKFLOW:
- * 1. SDK loaded via <script> tag in index.html
- * 2. Access via window.fhevm global
- * 3. Call window.fhevm.initSDK() to load WASM
- * 4. Call window.fhevm.createInstance() with config
+ * 1. SDK loaded via <script> tag in index.html (creates window.fhevm global)
+ * 2. Call window.fhevm.initSDK() to load WASM
+ * 3. Call window.fhevm.createInstance() with v0.9 Sepolia config
  */
 
 let fhevmInstance = null;
 let isInitialized = false;
 
 /**
- * FHEVM v0.9 Sepolia Configuration
+ * FHEVM v0.9 Sepolia Configuration (VERIFIED CORRECT)
  * Source: https://docs.zama.ai/protocol/solidity-guides/smart-contract/configure/contract_addresses
+ * Confirmed by Zama Discord mod 2025
  */
 const SEPOLIA_V09_CONFIG = {
   // ACL_CONTRACT_ADDRESS (FHEVM Host chain - Sepolia)
@@ -37,10 +37,10 @@ const SEPOLIA_V09_CONFIG = {
   // FHEVM Host chain id (Sepolia)
   chainId: 11155111,
   
-  // Gateway chain id (v0.9)
+  // Gateway chain id (v0.9) - CORRECT value is 10901, not 55815 from old docs
   gatewayChainId: 10901,
   
-  // Relayer URL
+  // Relayer URL (v0.9) - CORRECT domain is .org, not .cloud from old docs
   relayerUrl: 'https://relayer.testnet.zama.org',
 };
 
@@ -55,8 +55,13 @@ function checkSDKLoaded() {
   if (!window.fhevm) {
     throw new Error(
       'FHEVM SDK not loaded! Add this to index.html:\n' +
-      '<script src="https://cdn.zama.ai/relayer-sdk-js/0.3.0/relayer-sdk-js.umd.cjs"></script>'
+      '<script src="https://cdn.zama.org/relayer-sdk-js/0.3.0-5/relayer-sdk-js.umd.cjs"></script>'
     );
+  }
+  
+  // Verify SDK has required methods
+  if (!window.fhevm.initSDK || !window.fhevm.createInstance) {
+    throw new Error('FHEVM SDK loaded but missing required methods (initSDK, createInstance)');
   }
 }
 
@@ -67,16 +72,18 @@ function checkSDKLoaded() {
  * @returns {Promise<FhevmInstance>}
  */
 export async function initFhevm() {
+  // Return existing instance if already initialized
   if (fhevmInstance && isInitialized) {
     console.log('✓ FHEVM already initialized, returning existing instance');
     return fhevmInstance;
   }
   
   try {
-    console.log('🔧 Initializing FHEVM SDK v0.9 (CDN)...');
+    console.log('🔧 Initializing FHEVM SDK v0.9 (CDN v0.3.0-5)...');
     
-    // Check SDK is loaded
+    // Step 0: Verify SDK is loaded from CDN
     checkSDKLoaded();
+    console.log('  ✓ SDK loaded from CDN');
     
     // Step 1: Load WASM (CRITICAL - must be first!)
     console.log('  → Loading TFHE WASM...');
@@ -84,7 +91,7 @@ export async function initFhevm() {
     console.log('  ✓ TFHE WASM loaded successfully');
     
     // Step 2: Create instance with Sepolia v0.9 config
-    console.log('  → Creating FHEVM instance...');
+    console.log('  → Creating FHEVM instance with v0.9 config...');
     
     const config = {
       ...SEPOLIA_V09_CONFIG,
@@ -92,15 +99,29 @@ export async function initFhevm() {
       network: window.ethereum || 'https://sepolia.infura.io/v3/d05efcb7210a474e8b98308181a49685',
     };
     
+    console.log('  → Config:', {
+      chainId: config.chainId,
+      gatewayChainId: config.gatewayChainId,
+      relayerUrl: config.relayerUrl,
+      hasMetaMask: !!window.ethereum
+    });
+    
     fhevmInstance = await window.fhevm.createInstance(config);
     isInitialized = true;
     
     console.log('  ✓ FHEVM instance created successfully');
-    console.log('✅ FHEVM SDK v0.9 initialized');
+    console.log('✅ FHEVM SDK v0.9 initialization complete');
     
     return fhevmInstance;
   } catch (error) {
     console.error('❌ FHEVM initialization failed:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      sdkLoaded: !!window.fhevm,
+      sdkMethods: window.fhevm ? Object.keys(window.fhevm) : []
+    });
+    
     isInitialized = false;
     fhevmInstance = null;
     throw new Error(`FHEVM initialization failed: ${error.message}`);
@@ -148,7 +169,7 @@ export async function encryptVote(contractAddress, userAddress, optionIndex) {
     const encryptedData = await buffer.encrypt();
     
     console.log('  ✓ Vote encrypted successfully');
-    console.log('  → Handles:', encryptedData.handles);
+    console.log('  → Handle:', encryptedData.handles[0]);
     console.log('  → Proof length:', encryptedData.inputProof.length);
     
     return {
@@ -169,7 +190,7 @@ export function isSDKInitialized() {
 }
 
 /**
- * Reset FHEVM instance (for testing purposes)
+ * Reset FHEVM instance (for testing/debugging purposes)
  */
 export function resetFhevmInstance() {
   console.warn('⚠️ Resetting FHEVM instance');
