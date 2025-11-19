@@ -1,3 +1,6 @@
+//deprecated and not in use currently but kept by me
+
+
 import { useState, useEffect } from 'react';
 import { initFhevm } from '../utils/fhevm';
 
