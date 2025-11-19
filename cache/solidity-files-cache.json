@@ -40,46 +40,6 @@
         "SecretBallot"
       ]
     },
-    "C:\\Users\\Administrator\\Desktop\\fhevote\\node_modules\\@fhevm\\solidity\\config\\ZamaConfig.sol": {
-      "lastModificationDate": 1763498512213,
-      "contentHash": "d33d3a7d4f7659005ac6493a3b3bb844",
-      "sourceName": "@fhevm/solidity/config/ZamaConfig.sol",
-      "solcConfig": {
-        "version": "0.8.24",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "cancun",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "../lib/FHE.sol",
-        "../lib/Impl.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.24"
-      ],
-      "artifacts": [
-        "ZamaConfig",
-        "ZamaEthereumConfig"
-      ]
-    },
     "C:\\Users\\Administrator\\Desktop\\fhevote\\node_modules\\@fhevm\\solidity\\lib\\FHE.sol": {
       "lastModificationDate": 1763498495880,
       "contentHash": "a3654ad3694e201ea093182154462272",
@@ -119,6 +79,46 @@
       "artifacts": [
         "FHE",
         "IKMSVerifier"
+      ]
+    },
+    "C:\\Users\\Administrator\\Desktop\\fhevote\\node_modules\\@fhevm\\solidity\\config\\ZamaConfig.sol": {
+      "lastModificationDate": 1763498512213,
+      "contentHash": "d33d3a7d4f7659005ac6493a3b3bb844",
+      "sourceName": "@fhevm/solidity/config/ZamaConfig.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "cancun",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../lib/FHE.sol",
+        "../lib/Impl.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.24"
+      ],
+      "artifacts": [
+        "ZamaConfig",
+        "ZamaEthereumConfig"
       ]
     },
     "C:\\Users\\Administrator\\Desktop\\fhevote\\node_modules\\@fhevm\\solidity\\lib\\Impl.sol": {

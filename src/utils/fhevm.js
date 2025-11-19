@@ -1,13 +1,13 @@
 /**
  * FHEVM v0.9 Initialization with @zama-fhe/relayer-sdk v0.3.0-5 (CDN)
  * 
- * Using CDN bundle approach for web apps 
+ * Using CDN bundle approach for web apps per Discord mod recommendation
  * CDN URL: https://cdn.zama.org/relayer-sdk-js/0.3.0-5/relayer-sdk-js.umd.cjs
  * 
  * CRITICAL WORKFLOW:
- * 1. SDK loaded via <script> tag in index.html (creates window.fhevm global)
- * 2. Call window.fhevm.initSDK() to load WASM
- * 3. Call window.fhevm.createInstance() with v0.9 Sepolia config
+ * 1. SDK loaded via <script> tag in index.html (creates window.relayerSDK global)
+ * 2. Call window.relayerSDK.initSDK() to load WASM
+ * 3. Call window.relayerSDK.createInstance() with v0.9 Sepolia config
  */
 
 let fhevmInstance = null;
@@ -16,7 +16,7 @@ let isInitialized = false;
 /**
  * FHEVM v0.9 Sepolia Configuration (VERIFIED CORRECT)
  * Source: https://docs.zama.ai/protocol/solidity-guides/smart-contract/configure/contract_addresses
- * 
+ * Confirmed by Zama Discord mod 2025
  */
 const SEPOLIA_V09_CONFIG = {
   // ACL_CONTRACT_ADDRESS (FHEVM Host chain - Sepolia)
@@ -45,6 +45,48 @@ const SEPOLIA_V09_CONFIG = {
 };
 
 /**
+ * Wait for SDK to load from CDN (with timeout)
+ * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 10000)
+ * @returns {Promise<void>}
+ */
+async function waitForSDKLoaded(maxWaitMs = 10000) {
+  if (typeof window === 'undefined') {
+    throw new Error('Must run in browser environment');
+  }
+  
+  // If already loaded, return immediately
+  if (window.relayerSDK && window.relayerSDK.initSDK && window.relayerSDK.createInstance) {
+    return;
+  }
+  
+  const startTime = Date.now();
+  const checkInterval = 100; // Check every 100ms
+  
+  return new Promise((resolve, reject) => {
+    const checkSDK = () => {
+      if (window.relayerSDK && window.relayerSDK.initSDK && window.relayerSDK.createInstance) {
+        resolve();
+        return;
+      }
+      
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= maxWaitMs) {
+        reject(new Error(
+          `FHEVM SDK failed to load within ${maxWaitMs}ms. ` +
+          'Make sure this script is in index.html:\n' +
+          '<script src="https://cdn.zama.org/relayer-sdk-js/0.3.0-5/relayer-sdk-js.umd.cjs"></script>'
+        ));
+        return;
+      }
+      
+      setTimeout(checkSDK, checkInterval);
+    };
+    
+    checkSDK();
+  });
+}
+
+/**
  * Check if SDK is loaded from CDN
  */
 function checkSDKLoaded() {
@@ -52,7 +94,7 @@ function checkSDKLoaded() {
     throw new Error('Must run in browser environment');
   }
   
-  if (!window.fhevm) {
+  if (!window.relayerSDK) {
     throw new Error(
       'FHEVM SDK not loaded! Add this to index.html:\n' +
       '<script src="https://cdn.zama.org/relayer-sdk-js/0.3.0-5/relayer-sdk-js.umd.cjs"></script>'
@@ -60,7 +102,7 @@ function checkSDKLoaded() {
   }
   
   // Verify SDK has required methods
-  if (!window.fhevm.initSDK || !window.fhevm.createInstance) {
+  if (!window.relayerSDK.initSDK || !window.relayerSDK.createInstance) {
     throw new Error('FHEVM SDK loaded but missing required methods (initSDK, createInstance)');
   }
 }
@@ -81,13 +123,14 @@ export async function initFhevm() {
   try {
     console.log('🔧 Initializing FHEVM SDK v0.9 (CDN v0.3.0-5)...');
     
-    // Step 0: Verify SDK is loaded from CDN
-    checkSDKLoaded();
+    // Step 0: Wait for SDK to load from CDN (with timeout)
+    console.log('  → Waiting for SDK script to load...');
+    await waitForSDKLoaded(10000); // Wait up to 10 seconds
     console.log('  ✓ SDK loaded from CDN');
     
     // Step 1: Load WASM (CRITICAL - must be first!)
     console.log('  → Loading TFHE WASM...');
-    await window.fhevm.initSDK();
+    await window.relayerSDK.initSDK();
     console.log('  ✓ TFHE WASM loaded successfully');
     
     // Step 2: Create instance with Sepolia v0.9 config
@@ -106,7 +149,7 @@ export async function initFhevm() {
       hasMetaMask: !!window.ethereum
     });
     
-    fhevmInstance = await window.fhevm.createInstance(config);
+    fhevmInstance = await window.relayerSDK.createInstance(config);
     isInitialized = true;
     
     console.log('  ✓ FHEVM instance created successfully');
@@ -118,8 +161,8 @@ export async function initFhevm() {
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
-      sdkLoaded: !!window.fhevm,
-      sdkMethods: window.fhevm ? Object.keys(window.fhevm) : []
+      sdkLoaded: !!window.relayerSDK,
+      sdkMethods: window.relayerSDK ? Object.keys(window.relayerSDK) : []
     });
     
     isInitialized = false;

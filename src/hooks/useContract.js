@@ -48,39 +48,64 @@ export function useContract(signer) {
    * Cast encrypted vote with FHEVM validation
    */
   const vote = async (pollId, optionIndex, userAddress) => {
-    if (!contract) throw new Error('Contract not initialized');
-    
-    // CRITICAL: Check FHEVM is initialized before attempting to vote
-    if (!isSDKInitialized()) {
-      throw new Error('FHEVM SDK not initialized. Please refresh the page.');
-    }
-    
-    console.log('🗳️ Casting vote...', { pollId, optionIndex, userAddress });
-    
-    // Get contract address for encryption
+    if (!contract) throw new Error("Contract not initialized");
+    if (!isSDKInitialized()) throw new Error("FHEVM SDK not initialized. Please refresh.");
+  
+    console.log("🗳️ Casting vote...", { pollId, optionIndex, userAddress });
+  
     const contractAddress = await contract.getAddress();
-    
-    // Encrypt vote using SDK
+  
+    // Encrypt vote using the FHEVM SDK
     const encrypted = await encryptVote(contractAddress, userAddress, optionIndex);
-    
-    console.log('  → Encrypted vote data:', {
+  
+    console.log("  → Encrypted vote data:", {
       handle: encrypted.handles[0],
-      proofLength: encrypted.inputProof.length
+      proofType: typeof encrypted.inputProof,
+      proofLength: encrypted.inputProof?.length,
     });
-    
-    // Submit vote to contract
-    const tx = await contract.vote(
-      pollId,
-      encrypted.handles[0], // externalEuint8 handle
-      encrypted.inputProof   // Input verification proof
-    );
-    
+  
+    // --- Utility: convert Uint8Array → hex string ---
+    const toHex = (data) => {
+      if (!data) throw new Error("Missing data to hexify");
+      if (typeof data === "string" && data.startsWith("0x")) return data;
+      if (data instanceof Uint8Array)
+        return (
+          "0x" +
+          Array.from(data, (b) => b.toString(16).padStart(2, "0")).join("")
+        );
+      throw new Error("Unsupported data type for toHex(): " + typeof data);
+    };
+  
+    // --- Utility: ensure hex string is exactly 32 bytes (64 hex chars) ---
+    const toFixed32 = (hex) => {
+      if (!hex.startsWith("0x")) throw new Error("Missing 0x prefix");
+      const clean = hex.slice(2);
+      if (clean.length > 64) return "0x" + clean.slice(0, 64); // truncate
+      return "0x" + clean.padEnd(64, "0"); // pad to 32 bytes
+    };
+  
+    // Convert handle and proof to proper formats
+    const handleHex = toFixed32(toHex(encrypted.handles[0]));
+    const proofHex = toHex(encrypted.inputProof);
+    const pollIdNum = BigInt(pollId);
+  
+    console.log("🧾 Prepared vote payload:", {
+      pollIdNum,
+      handleHex,
+      proofHex,
+      handleLength: (handleHex.length - 2) / 2 + " bytes",
+      proofLength: (proofHex.length - 2) / 2 + " bytes",
+    });
+  
+    // --- Send transaction ---
+    const tx = await contract.vote(pollIdNum, handleHex, proofHex);
     const receipt = await tx.wait();
-    console.log('✅ Vote cast successfully');
-    
+  
+    console.log("✅ Vote cast successfully");
     return receipt;
   };
-
+  
+  
   /**
    * Close poll (marks ciphertexts for public decryption)
    */
