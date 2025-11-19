@@ -1,7 +1,7 @@
 /**
  * FHEVM v0.9 Initialization with @zama-fhe/relayer-sdk v0.3.0-5 (CDN)
  * 
- * Using CDN bundle approach for web apps per Discord mod recommendation
+ * Using CDN bundle approach for web apps 
  * CDN URL: https://cdn.zama.org/relayer-sdk-js/0.3.0-5/relayer-sdk-js.umd.cjs
  * 
  * CRITICAL WORKFLOW:
