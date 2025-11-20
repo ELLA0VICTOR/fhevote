@@ -20,13 +20,16 @@ export function useContract(signer) {
 
   /**
    * Create a new poll
+   * @param {string} question - Poll question
+   * @param {string[]} options - Array of option strings
+   * @param {number} durationMinutes - Duration in MINUTES (updated for v2)
    */
-  const createPoll = async (question, options, durationHours) => {
+  const createPoll = async (question, options, durationMinutes) => {
     if (!contract) throw new Error('Contract not initialized');
     
-    console.log('📝 Creating poll...', { question, options, durationHours });
+    console.log('📝 Creating poll...', { question, options, durationMinutes });
     
-    const tx = await contract.createPoll(question, options, durationHours);
+    const tx = await contract.createPoll(question, options, durationMinutes);
     const receipt = await tx.wait();
     
     // Extract pollId from PollCreated event
@@ -178,7 +181,18 @@ export function useContract(signer) {
   };
 
   /**
-   * Get active poll IDs
+   * ✅ NEW: Get ALL existing poll IDs (active + ended)
+   */
+  const getAllPollIds = async () => {
+    if (!contract) {
+      console.warn('⚠️ Contract not ready yet');
+      return [];
+    }
+    return await contract.getAllPollIds();
+  };
+
+  /**
+   * Get active (not expired) poll IDs only
    */
   const getActivePollIds = async () => {
     if (!contract) {
@@ -289,6 +303,7 @@ export function useContract(signer) {
     getPoll,
     hasVoted,
     getFinalResults,
+    getAllPollIds, // ✅ NEW
     getActivePollIds,
     decryptAndSubmitResults
   };

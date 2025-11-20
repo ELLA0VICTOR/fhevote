@@ -9,8 +9,11 @@ import { VoteModal } from '../components/polls/VoteModal';
 import { ResultsDisplay } from '../components/polls/ResultsDisplay';
 import { LoadingSpinner } from '../components/retroui/common/LoadingSpinner';
 import { toast } from 'sonner';
-import { ArrowLeft, Clock, User, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, User, Trash2, RefreshCw } from 'lucide-react';
 
+/**
+ * ✅ FIXED: Poll Detail Component with accurate timer and clean logging
+ */
 export const PollDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -23,9 +26,20 @@ export const PollDetail = () => {
   const [userHasVoted, setUserHasVoted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [voteEvents, setVoteEvents] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
+
+  // Update current time every second for live timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchPollData = async () => {
-    // Don't fetch if contract not ready
     if (!contract || !signer) {
       console.log('⏸️ Waiting for contract/signer to be ready...');
       setLoading(false);
@@ -47,7 +61,7 @@ export const PollDetail = () => {
       
       const voted = account ? await hasVoted(id, account) : false;
       
-      setPoll({
+      const pollState = {
         id: Number(id),
         question: pollData.question,
         options: pollData.options,
@@ -55,9 +69,21 @@ export const PollDetail = () => {
         endTime: Number(pollData.endTime),
         isActive: pollData.isActive,
         finalResults: pollData.finalResults || []
-      });
+      };
       
+      setPoll(pollState);
       setUserHasVoted(voted);
+      
+      // Fetch vote events for live tracking
+      try {
+        const filter = contract.filters.VoteCast(id);
+        const events = await contract.queryFilter(filter);
+        setVoteEvents(events);
+        console.log(`📊 Fetched ${events.length} vote event(s)`);
+      } catch (error) {
+        console.error('Failed to fetch vote events:', error);
+      }
+      
       console.log('✅ Poll data loaded successfully');
     } catch (error) {
       console.error('❌ Failed to fetch poll:', error);
@@ -65,13 +91,57 @@ export const PollDetail = () => {
       navigate('/');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchPollData();
+    if (contract && signer) {
+      fetchPollData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, contract, signer, refreshKey]);
+
+  useEffect(() => {
+    if (!contract || !poll || !poll.isActive) return;
+
+    const now = Date.now() / 1000;
+    const isPollExpired = now >= poll.endTime;
+    
+    if (isPollExpired) {
+      console.log('⏹️ Poll expired, not setting up event listener');
+      return;
+    }
+
+    console.log('👂 Setting up real-time event listener for VoteCast...');
+    
+    const filter = contract.filters.VoteCast(id);
+    
+    const handleVoteEvent = async (pollId, voter, event) => {
+      console.log('🔔 New vote detected!', { pollId: pollId.toString(), voter });
+      
+      try {
+        const events = await contract.queryFilter(filter);
+        setVoteEvents(events);
+        console.log(`📊 Updated to ${events.length} vote event(s)`);
+      } catch (error) {
+        console.error('Failed to fetch updated vote events:', error);
+      }
+    };
+    
+    contract.on(filter, handleVoteEvent);
+
+    return () => {
+      console.log('🛑 Removing event listener');
+      contract.off(filter, handleVoteEvent);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract, poll?.id, poll?.isActive, poll?.endTime]);
+
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    setRefreshKey(prev => prev + 1);
+  };
 
   const handleVote = async (optionIndex) => {
     if (!contract) {
@@ -79,9 +149,7 @@ export const PollDetail = () => {
       return;
     }
 
-    // CRITICAL: Validate poll is still active and not expired
-    const now = Date.now() / 1000;
-    if (now >= poll.endTime) {
+    if (currentTime >= poll.endTime) {
       toast.error('This poll has ended. No more votes accepted.');
       return;
     }
@@ -95,10 +163,10 @@ export const PollDetail = () => {
       await vote(id, optionIndex, account);
       setUserHasVoted(true);
       toast.success('Vote cast successfully!');
+      
       setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Vote failed:', error);
-      // Error toast already handled by VoteModal
     }
   };
 
@@ -147,11 +215,9 @@ export const PollDetail = () => {
       setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Decryption failed:', error);
-      // Error toast already handled by ResultsDisplay
     }
   };
 
-  // Show loading spinner while waiting for contract
   if (loading || !contract) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
@@ -178,35 +244,53 @@ export const PollDetail = () => {
     );
   }
 
-  // Calculate if poll has truly ended (time-based)
-  const now = Date.now() / 1000;
-  const isPollExpired = now >= poll.endTime;
+  const isPollExpired = currentTime >= poll.endTime;
   const isCreator = account && account.toLowerCase() === poll.creator.toLowerCase();
 
+  /**
+   * ✅ FIXED: Clean timer calculation with NO console spam
+   */
   const timeRemaining = () => {
-    const diff = poll.endTime - now;
+    const diff = poll.endTime - currentTime;
 
     if (diff <= 0) return 'Poll ended';
 
     const days = Math.floor(diff / 86400);
     const hours = Math.floor((diff % 86400) / 3600);
     const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = Math.floor(diff % 60);
 
     if (days > 0) return `${days}d ${hours}h remaining`;
     if (hours > 0) return `${hours}h ${minutes}m remaining`;
-    return `${minutes}m remaining`;
+    if (minutes > 0) return `${minutes}m ${seconds}s remaining`;
+    return `${seconds}s remaining`;
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Button
-        variant="ghost"
-        onClick={() => navigate('/')}
-        className="mb-6 flex items-center gap-2"
-      >
-        <ArrowLeft size={16} />
-        Back to Polls
-      </Button>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="flex items-center justify-between mb-6">
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft size={16} />
+          Back to Polls
+        </Button>
+
+        {poll.isActive && !isPollExpired && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        )}
+      </div>
 
       <Card className="mb-8">
         <CardHeader>
@@ -223,7 +307,6 @@ export const PollDetail = () => {
                 {poll.isActive && !isPollExpired ? 'Active' : 'Ended'}
               </Badge>
               
-              {/* Delete Button (Creator Only) */}
               {isCreator && (
                 <Button
                   variant="destructive"
@@ -246,7 +329,6 @@ export const PollDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <Card className="mb-8 border-destructive">
           <CardContent className="p-6">
@@ -255,16 +337,10 @@ export const PollDetail = () => {
               This action cannot be undone. All votes will be permanently deleted.
             </p>
             <div className="flex gap-3">
-              <Button
-                variant="destructive"
-                onClick={handleDeletePoll}
-              >
+              <Button variant="destructive" onClick={handleDeletePoll}>
                 Yes, Delete Poll
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowDeleteConfirm(false)}
-              >
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
                 Cancel
               </Button>
             </div>
@@ -272,8 +348,8 @@ export const PollDetail = () => {
         </Card>
       )}
 
-      <div className="space-y-6">
-        {/* Vote Section - Only show if poll is active AND not expired */}
+      {/* ✅ FIXED: Wider container with better card spacing */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {poll.isActive && !isPollExpired && (
           <VoteModal
             poll={poll}
@@ -283,26 +359,22 @@ export const PollDetail = () => {
           />
         )}
 
-        {/* Close Poll Button (Creator Only) - Show if expired but still marked active */}
         {isCreator && isPollExpired && poll.isActive && (
-          <Card className="bg-accent">
+          <Card className="bg-accent lg:col-span-2">
             <CardContent className="p-6">
               <p className="font-medium mb-4">Poll has ended - Close to prepare for decryption</p>
-              <Button
-                onClick={handleClosePoll}
-                className="w-full"
-              >
+              <Button onClick={handleClosePoll} className="w-full">
                 Close Poll & Mark for Decryption
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Results Section */}
         <ResultsDisplay
           poll={poll}
           isCreator={isCreator}
           onDecrypt={handleDecrypt}
+          voteEvents={voteEvents}
         />
       </div>
     </div>

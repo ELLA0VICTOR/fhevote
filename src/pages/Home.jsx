@@ -3,21 +3,37 @@ import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import { usePolls } from '../hooks/usePolls';
 import { Button } from '../components/retroui/Button';
+import { Badge } from '../components/retroui/Badge';
 import { PollList } from '../components/polls/PollList';
-import { Vote, Plus, Search, Lock, Zap, Target } from 'lucide-react';
+import { Vote, Plus, Search, Lock, Zap, Target, Filter, RefreshCw } from 'lucide-react';
 
+/**
+ * Home Page - Main landing page with filters and poll list
+ * 
+ * FEATURES:
+ * - Beautiful hero section with FHE benefits
+ * - Filter tabs: All / Active / Ended / My Polls
+ * - Shows ALL polls (persistent across page reloads)
+ * - Auto-refresh support
+ */
 export const Home = () => {
   const navigate = useNavigate();
-  const { signer } = useWalletContext();
+  const { signer, account, isConnected } = useWalletContext();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'active' | 'ended' | 'my-polls'
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Pass refreshTrigger to usePolls
-  const { polls, loading } = usePolls(signer, refreshTrigger);
+  // Fetch polls with current filter - NOW FETCHES ALL POLLS!
+  const { polls, loading } = usePolls(signer, refreshTrigger, filterMode, account);
 
-  // This function can be called from child components or after actions
+  // Refresh polls handler
   const refreshPolls = () => {
     console.log('🔄 Triggering poll list refresh...');
+    setIsRefreshing(true);
     setRefreshTrigger(prev => prev + 1);
+    
+    // Reset refreshing state after 1 second
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   // Check if we just came back from creating a poll
@@ -27,7 +43,47 @@ export const Home = () => {
       sessionStorage.removeItem('pollJustCreated');
       refreshPolls();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Filter options configuration
+  const filterOptions = [
+    { 
+      value: 'all', 
+      label: 'All Polls',
+      description: 'Show all existing polls'
+    },
+    { 
+      value: 'active', 
+      label: 'Active',
+      description: 'Currently running polls'
+    },
+    { 
+      value: 'ended', 
+      label: 'Ended',
+      description: 'Expired or closed polls'
+    },
+    { 
+      value: 'my-polls', 
+      label: 'My Polls',
+      description: 'Polls you created',
+      requiresAuth: true 
+    }
+  ];
+
+  // Get empty message based on filter
+  const getEmptyMessage = () => {
+    switch (filterMode) {
+      case 'active':
+        return "No active polls right now. Create the first one!";
+      case 'ended':
+        return "No ended polls yet.";
+      case 'my-polls':
+        return "You haven't created any polls yet.";
+      default:
+        return "No polls yet. Be the first to create one!";
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -54,7 +110,7 @@ export const Home = () => {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => document.getElementById('polls').scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => document.getElementById('polls')?.scrollIntoView({ behavior: 'smooth' })}
               className="flex items-center gap-2"
             >
               <Search size={20} />
@@ -98,20 +154,88 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Active Polls Section */}
+      {/* Active Polls Section with Filters */}
       <section id="polls" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="font-head text-3xl">Active Polls</h2>
-          <Button
-            variant="outline"
-            onClick={() => navigate('/create')}
-            className="flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Create New Poll
-          </Button>
+        {/* Header with Create Button */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div>
+            <h2 className="font-head text-3xl mb-2">Browse Polls</h2>
+            <p className="text-muted-foreground text-sm">
+              All polls are stored permanently on the blockchain
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshPolls}
+              disabled={isRefreshing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button
+              onClick={() => navigate('/create')}
+              className="flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Create New Poll
+            </Button>
+          </div>
         </div>
-        <PollList polls={polls} loading={loading} />
+
+        {/* Filter Tabs */}
+        <div className="bg-card border-2 border-border shadow-md rounded-lg p-4 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter size={16} className="text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Filter Polls:</span>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {filterOptions.map((option) => {
+              // Hide "My Polls" if not connected
+              if (option.requiresAuth && !isConnected) return null;
+
+              const isActive = filterMode === option.value;
+
+              return (
+                <Button
+                  key={option.value}
+                  variant={isActive ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilterMode(option.value)}
+                  className="flex items-center gap-2"
+                  title={option.description}
+                >
+                  {option.label}
+                  {isActive && (
+                    <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
+                      {polls.length}
+                    </Badge>
+                  )}
+                </Button>
+              );
+            })}
+          </div>
+          
+          {/* Filter Description */}
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="text-xs text-muted-foreground">
+              {filterOptions.find(o => o.value === filterMode)?.description}
+            </p>
+          </div>
+        </div>
+
+        {/* Poll List */}
+        <PollList 
+          polls={polls} 
+          loading={loading}
+          emptyMessage={getEmptyMessage()}
+        />
+
+       
+
+        
       </section>
     </div>
   );
