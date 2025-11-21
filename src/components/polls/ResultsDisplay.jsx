@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// FIX: Updated relative imports to match the structure in PollDetail.jsx
 import { Card, CardHeader, CardTitle, CardContent } from '../retroui/Card';
 import { Button } from '../retroui/Button';
 import { Badge } from '../retroui/Badge';
@@ -9,10 +10,11 @@ import { toast } from 'sonner';
 import { Lock, Unlock, TrendingUp } from 'lucide-react';
 
 /**
- * ✅ FIXED: Results Display with accurate vote progress bars
+ * ✅ UPDATED: Results Display now uses the external isDecrypting prop for controlled state.
+ * FIX: Corrected component import paths.
  */
-export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [] }) => {
-  const [isDecrypting, setIsDecrypting] = useState(false);
+export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], isDecrypting }) => {
+  // Removed internal isDecrypting state as it's now controlled by the parent (PollDetail.jsx)
   const [liveVoteCount, setLiveVoteCount] = useState(0);
 
   // Count votes from events
@@ -22,18 +24,20 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [] }) 
     }
   }, [voteEvents]);
 
+  // Use the external isDecrypting prop to control the UI logic
   const handleDecrypt = async () => {
-    setIsDecrypting(true);
+    // No need to set internal state, the parent handles the UI state change
     const toastId = toast.loading('Decrypting results...');
 
     try {
+      // The parent component (PollDetail) now handles the toast success/error on completion
       await onDecrypt();
       toast.success('Results revealed!', { id: toastId });
     } catch (error) {
-      console.error('Decryption failed:', error);
-      toast.error('Failed to decrypt results: ' + error.message, { id: toastId });
-    } finally {
-      setIsDecrypting(false);
+      // Note: PollDetail.jsx already handles complex error messages, 
+      // so this catch block can be simplified here.
+      console.error('Decryption failed at ResultsDisplay:', error);
+      toast.error('Decryption failed. Check console for details.', { id: toastId });
     }
   };
 
@@ -140,6 +144,7 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [] }) 
             <p className="text-muted-foreground">
               Poll has ended. Click below to decrypt and reveal the final results.
             </p>
+            {/* ⚠️ Use external isDecrypting prop here ⚠️ */}
             <Button
               onClick={handleDecrypt}
               disabled={isDecrypting}
@@ -148,7 +153,7 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [] }) 
               {isDecrypting ? (
                 <>
                   <LoadingSpinner size={16} className="mr-2" />
-                  Decrypting...
+                  Decryption Proof Generating...
                 </>
               ) : (
                 <>
@@ -198,7 +203,7 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [] }) 
   }
 
   // ========================================
-  // CASE 4: ✅ FIXED - LIVE VOTING with Real Vote Progress
+  // CASE 4: LIVE VOTING with Real Vote Progress
   // ========================================
   return (
     <Card>

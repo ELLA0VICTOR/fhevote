@@ -4,11 +4,9 @@
  * CRITICAL v0.9 WORKFLOW:
  * 1. Contract marks ciphertext as publicly decryptable: FHE.makePubliclyDecryptable()
  * 2. Client fetches ciphertext handles from contract
- * 3. Client calls instance.publicDecrypt(handles) - returns cleartext values
- * 4. Client submits cleartext back to contract with proof
+ * 3. Client calls instance.publicDecrypt(handles) - returns PublicDecryptResults object
+ * 4. Client submits cleartext + decryptionProof back to contract
  * 5. Contract verifies with FHE.checkSignatures()
- * 
- * NO BACKEND MICROSERVICE - Direct SDK usage!
  * 
  * Docs: https://docs.zama.org/protocol/relayer-sdk-guides/fhevm-relayer/decryption/public-decryption
  */
@@ -18,10 +16,15 @@ import { getFhevmInstance } from './fhevm';
 /**
  * Decrypt poll results using FHEVM v0.9 public decryption
  * 
- * Per SDK docs: instance.publicDecrypt(handles) returns object mapping handles to values
+ * Per SDK docs: instance.publicDecrypt(handles) returns PublicDecryptResults:
+ * {
+ *   clearValues: Record<handle, bigint | boolean | hex>,
+ *   abiEncodedClearValues: `0x${string}`,
+ *   decryptionProof: `0x${string}`
+ * }
  * 
  * @param {string[]} handlesList - Array of ciphertext handles (bytes32 hex strings)
- * @returns {Promise<{[handle: string]: bigint}>} - Object mapping handles to decrypted values
+ * @returns {Promise<PublicDecryptResults>} - Full decryption result object with proof
  */
 export async function decryptPollResults(handlesList) {
   try {
@@ -51,43 +54,68 @@ export async function decryptPollResults(handlesList) {
     
     // Call SDK public decrypt method
     console.log('  → Calling instance.publicDecrypt()...');
-    const decryptedValues = await instance.publicDecrypt(handlesList);
+    const results = await instance.publicDecrypt(handlesList);
     
     console.log('  ✓ Decryption successful');
-    console.log('  → Decrypted values:', decryptedValues);
+    console.log('  → Results structure:', {
+      hasClearValues: !!results.clearValues,
+      hasAbiEncoded: !!results.abiEncodedClearValues,
+      hasProof: !!results.decryptionProof,
+      clearValuesCount: Object.keys(results.clearValues || {}).length,
+      proofLength: results.decryptionProof?.length
+    });
     
-    // SDK returns object like:
-    // {
-    //   '0x830a61...': 5n,
-    //   '0x98ee52...': 12n,
-    //   '0xb837a6...': 3n
-    // }
+    // Log individual decrypted values
+    if (results.clearValues) {
+      Object.entries(results.clearValues).forEach(([handle, value]) => {
+        console.log(`    Handle ${handle.slice(0, 10)}... → ${value}`);
+      });
+    }
     
-    return decryptedValues;
+    // Verify we got all expected values
+    if (!results.clearValues || Object.keys(results.clearValues).length !== handlesList.length) {
+      throw new Error(
+        `Incomplete decryption: expected ${handlesList.length} values, got ${Object.keys(results.clearValues || {}).length}`
+      );
+    }
+    
+    // Verify proof exists
+    if (!results.decryptionProof || results.decryptionProof === '0x') {
+      throw new Error('Decryption proof missing from results');
+    }
+    
+    return results;
   } catch (error) {
     console.error('❌ Public decryption failed:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      handlesList
+    });
     throw new Error(`Failed to decrypt results: ${error.message}`);
   }
 }
 
 /**
  * Format decrypted results for display
- * Converts SDK response object to array matching poll options order
+ * Converts SDK PublicDecryptResults.clearValues object to array matching poll options order
  * 
- * @param {Object} decryptionResult - Object from publicDecrypt() mapping handles to bigints
+ * @param {Object} clearValues - clearValues from PublicDecryptResults (maps handles to bigints)
  * @param {string[]} handleOrder - Array of handles in the correct order
  * @returns {number[]} - Array of vote counts as numbers
  */
-export function formatDecryptedResults(decryptionResult, handleOrder) {
-  if (!decryptionResult || !handleOrder) {
-    throw new Error('Invalid decryption result or handle order');
+export function formatDecryptedResults(clearValues, handleOrder) {
+  if (!clearValues || !handleOrder) {
+    throw new Error('Invalid clearValues or handle order');
   }
   
   console.log('📊 Formatting decrypted results...');
+  console.log('  → Handles order:', handleOrder.length);
+  console.log('  → Clear values count:', Object.keys(clearValues).length);
   
   // Convert object to array in correct order
   const resultsArray = handleOrder.map((handle, index) => {
-    const value = decryptionResult[handle];
+    const value = clearValues[handle];
     
     if (value === undefined) {
       console.warn(`⚠️ No value found for handle ${handle}, using 0`);
@@ -138,7 +166,7 @@ export function extractHandles(voteCountCiphertexts) {
     return handle;
   });
   
-  console.log('  ✓ Extracted', handles.length, 'handles');
+  console.log(`  ✓ Extracted ${handles.length} handles`);
   return handles;
 }
 

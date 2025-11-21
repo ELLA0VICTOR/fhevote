@@ -26,10 +26,6 @@ contract SecretBallot is ZamaEthereumConfig {
     event ResultsSubmitted(uint indexed pollId, uint256[] results);
     event PollDeleted(uint indexed pollId, address indexed creator);
     
-    /**
-     * ✅ UPDATED: Now accepts durationMinutes instead of durationHours
-     * This allows for flexible poll durations including 1-minute demos
-     */
     function createPoll(
         string memory question,
         string[] memory options,
@@ -44,13 +40,10 @@ contract SecretBallot is ZamaEthereumConfig {
         poll.question = question;
         poll.options = options;
         poll.creator = msg.sender;
-        
-        // Convert minutes to seconds for endTime calculation
         poll.endTime = block.timestamp + (durationMinutes * 60);
         poll.isActive = true;
         poll.exists = true;
         
-        // Initialize encrypted vote counts to zero
         for (uint i = 0; i < options.length; i++) {
             poll.voteCounts[i] = FHE.asEuint32(0);
             FHE.allowThis(poll.voteCounts[i]);
@@ -111,24 +104,62 @@ contract SecretBallot is ZamaEthereumConfig {
         emit PollDeleted(pollId, msg.sender);
     }
     
+    /**
+     * ✅ CRITICAL FIX: Decode as individual uint32 values, not uint256[]
+     * 
+     * The SDK's abiEncodedClearValues encodes euint32 values as uint32, not uint256!
+     * We must decode them as individual uint32 values matching the order of handles.
+     */
     function submitResults(
         uint pollId,
-        uint256[] memory decryptedResults,
-        bytes memory proof
+        bytes memory abiEncodedResults,
+        bytes memory decryptionProof
     ) external {
         Poll storage poll = polls[pollId];
         require(poll.exists, "Poll does not exist");
         require(!poll.isActive, "Poll still active");
         require(poll.finalResults.length == 0, "Results already submitted");
-        require(decryptedResults.length == poll.options.length, "Invalid results length");
         
-        bytes32[] memory cts = new bytes32[](poll.options.length);
+        // Build handles array in the SAME ORDER as passed to publicDecrypt()
+        bytes32[] memory handlesList = new bytes32[](poll.options.length);
         for (uint i = 0; i < poll.options.length; i++) {
-            cts[i] = FHE.toBytes32(poll.voteCounts[i]);
+            handlesList[i] = FHE.toBytes32(poll.voteCounts[i]);
         }
         
-        bytes memory abiEncoded = abi.encode(decryptedResults);
-        FHE.checkSignatures(cts, abiEncoded, proof);
+        // Verify signatures BEFORE decoding
+        FHE.checkSignatures(handlesList, abiEncodedResults, decryptionProof);
+        
+        // ✅ CRITICAL: Decode as individual uint32 values, then convert to uint256[]
+        // The SDK encodes euint32 as uint32, not uint256
+        uint256[] memory decryptedResults = new uint256[](poll.options.length);
+        
+        // Decode the bytes as individual uint32 values
+        // Format: (uint32, uint32, uint32, uint32) for 4 options
+        if (poll.options.length == 2) {
+            (uint32 v0, uint32 v1) = abi.decode(abiEncodedResults, (uint32, uint32));
+            decryptedResults[0] = uint256(v0);
+            decryptedResults[1] = uint256(v1);
+        } else if (poll.options.length == 3) {
+            (uint32 v0, uint32 v1, uint32 v2) = abi.decode(abiEncodedResults, (uint32, uint32, uint32));
+            decryptedResults[0] = uint256(v0);
+            decryptedResults[1] = uint256(v1);
+            decryptedResults[2] = uint256(v2);
+        } else if (poll.options.length == 4) {
+            (uint32 v0, uint32 v1, uint32 v2, uint32 v3) = abi.decode(abiEncodedResults, (uint32, uint32, uint32, uint32));
+            decryptedResults[0] = uint256(v0);
+            decryptedResults[1] = uint256(v1);
+            decryptedResults[2] = uint256(v2);
+            decryptedResults[3] = uint256(v3);
+        } else if (poll.options.length == 5) {
+            (uint32 v0, uint32 v1, uint32 v2, uint32 v3, uint32 v4) = abi.decode(abiEncodedResults, (uint32, uint32, uint32, uint32, uint32));
+            decryptedResults[0] = uint256(v0);
+            decryptedResults[1] = uint256(v1);
+            decryptedResults[2] = uint256(v2);
+            decryptedResults[3] = uint256(v3);
+            decryptedResults[4] = uint256(v4);
+        } else {
+            revert("Invalid options count");
+        }
         
         poll.finalResults = decryptedResults;
         emit ResultsSubmitted(pollId, decryptedResults);
@@ -163,10 +194,6 @@ contract SecretBallot is ZamaEthereumConfig {
         return polls[pollId].hasVoted[voter];
     }
     
-    /**
-     * ✅ NEW: Get ALL existing polls (active + ended + closed)
-     * Frontend will handle filtering/sorting
-     */
     function getAllPollIds() external view returns (uint[] memory) {
         uint existingCount = 0;
         for (uint i = 0; i < pollCount; i++) {
@@ -187,9 +214,6 @@ contract SecretBallot is ZamaEthereumConfig {
         return existingIds;
     }
     
-    /**
-     * Get only currently active (not expired) polls
-     */
     function getActivePollIds() external view returns (uint[] memory) {
         uint activeCount = 0;
         for (uint i = 0; i < pollCount; i++) {

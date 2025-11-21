@@ -12,14 +12,14 @@ import { toast } from 'sonner';
 import { ArrowLeft, Clock, User, Trash2, RefreshCw } from 'lucide-react';
 
 /**
- * ✅ FIXED: Poll Detail Component with accurate timer and clean logging
+ * ✅ FIXED: Poll Detail Component with proper post-decryption refresh
  */
 export const PollDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { account, signer } = useWalletContext();
   const contractHook = useContract(signer);
-  const { contract, getPoll, vote, hasVoted, closePoll, deletePoll, decryptAndSubmitResults } = contractHook;
+  const { contract, getPoll, vote, hasVoted, closePoll, deletePoll, decryptAndSubmitResults, getFinalResults } = contractHook;
 
   const [poll, setPoll] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,6 +29,7 @@ export const PollDetail = () => {
   const [voteEvents, setVoteEvents] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
+  const [isDecrypting, setIsDecrypting] = useState(false);
 
   // Update current time every second for live timer
   useEffect(() => {
@@ -61,6 +62,18 @@ export const PollDetail = () => {
       
       const voted = account ? await hasVoted(id, account) : false;
       
+      // ✅ FIX: Fetch final results from contract
+      let finalResults = [];
+      try {
+        const results = await getFinalResults(id);
+        if (results && results.length > 0) {
+          finalResults = results.map(r => Number(r));
+          console.log('📊 Fetched final results:', finalResults);
+        }
+      } catch (error) {
+        console.log('ℹ️ No final results yet (poll not decrypted)');
+      }
+      
       const pollState = {
         id: Number(id),
         question: pollData.question,
@@ -68,7 +81,7 @@ export const PollDetail = () => {
         creator: pollData.creator,
         endTime: Number(pollData.endTime),
         isActive: pollData.isActive,
-        finalResults: pollData.finalResults || []
+        finalResults: finalResults
       };
       
       setPoll(pollState);
@@ -210,11 +223,52 @@ export const PollDetail = () => {
       return;
     }
 
+    if (isDecrypting) {
+      toast.warning('Decryption already in progress...');
+      return;
+    }
+
+    const toastId = toast.loading('Decrypting results...');
+    setIsDecrypting(true);
+
     try {
-      await decryptAndSubmitResults(id, poll.options.length);
-      setRefreshKey(prev => prev + 1);
+      console.log('🔓 Starting decryption from UI...');
+      
+      const results = await decryptAndSubmitResults(id, poll.options.length);
+      
+      console.log('✅ Decryption completed, results:', results);
+      
+      toast.success(`Results decrypted! Total votes: ${results.reduce((a, b) => a + b, 0)}`, {
+        id: toastId,
+        duration: 5000
+      });
+      
+      // ✅ CRITICAL FIX: Refresh poll data immediately to show results
+      console.log('🔄 Refreshing poll data to display results...');
+      await fetchPollData(); // Direct call instead of using refreshKey
+      
     } catch (error) {
-      console.error('Decryption failed:', error);
+      console.error('❌ Decryption failed:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to decrypt results';
+      
+      if (error.message.includes('not initialized')) {
+        errorMessage = 'FHEVM not ready. Please refresh the page.';
+      } else if (error.message.includes('Invalid handle')) {
+        errorMessage = 'Poll not properly closed. Try closing the poll again.';
+      } else if (error.message.includes('proof')) {
+        errorMessage = 'Verification failed. The decryption may have been tampered with.';
+      } else if (error.message.includes('publicly decryptable')) {
+        errorMessage = 'Poll not ready for decryption. Ensure it is closed first.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage, { id: toastId, duration: 7000 });
+      
+    } finally {
+      setIsDecrypting(false);
     }
   };
 
@@ -348,7 +402,6 @@ export const PollDetail = () => {
         </Card>
       )}
 
-      {/* ✅ FIXED: Wider container with better card spacing */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {poll.isActive && !isPollExpired && (
           <VoteModal
@@ -375,6 +428,7 @@ export const PollDetail = () => {
           isCreator={isCreator}
           onDecrypt={handleDecrypt}
           voteEvents={voteEvents}
+          isDecrypting={isDecrypting}
         />
       </div>
     </div>

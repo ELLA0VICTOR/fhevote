@@ -5,7 +5,7 @@ import contractArtifact from '../../artifacts/contracts/SecretBallot.sol/SecretB
  * ✅ Official deployed contract address
  *    Make sure this matches your latest `npx hardhat run scripts/deploy.js --network sepolia` output.
  */
-const DEPLOYED_CONTRACT_ADDRESS = "0xE499c6B91908Bb99b603D77a92b3F522Ead4c53a";
+const DEPLOYED_CONTRACT_ADDRESS = "0xef02160D60D818f77f30f003242Da8708bd007d8";
 
 /**
  * Returns the contract address from the environment or hardcoded constant.

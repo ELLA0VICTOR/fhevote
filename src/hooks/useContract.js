@@ -18,12 +18,6 @@ export function useContract(signer) {
     }
   }, [signer]);
 
-  /**
-   * Create a new poll
-   * @param {string} question - Poll question
-   * @param {string[]} options - Array of option strings
-   * @param {number} durationMinutes - Duration in MINUTES (updated for v2)
-   */
   const createPoll = async (question, options, durationMinutes) => {
     if (!contract) throw new Error('Contract not initialized');
     
@@ -32,7 +26,6 @@ export function useContract(signer) {
     const tx = await contract.createPoll(question, options, durationMinutes);
     const receipt = await tx.wait();
     
-    // Extract pollId from PollCreated event
     const event = receipt.logs.find(log => {
       try {
         return contract.interface.parseLog(log)?.name === 'PollCreated';
@@ -47,9 +40,6 @@ export function useContract(signer) {
     return { pollId, receipt };
   };
 
-  /**
-   * Cast encrypted vote with FHEVM validation
-   */
   const vote = async (pollId, optionIndex, userAddress) => {
     if (!contract) throw new Error("Contract not initialized");
     if (!isSDKInitialized()) throw new Error("FHEVM SDK not initialized. Please refresh.");
@@ -57,17 +47,8 @@ export function useContract(signer) {
     console.log("🗳️ Casting vote...", { pollId, optionIndex, userAddress });
   
     const contractAddress = await contract.getAddress();
-  
-    // Encrypt vote using the FHEVM SDK
     const encrypted = await encryptVote(contractAddress, userAddress, optionIndex);
   
-    console.log("  → Encrypted vote data:", {
-      handle: encrypted.handles[0],
-      proofType: typeof encrypted.inputProof,
-      proofLength: encrypted.inputProof?.length,
-    });
-  
-    // --- Utility: convert Uint8Array → hex string ---
     const toHex = (data) => {
       if (!data) throw new Error("Missing data to hexify");
       if (typeof data === "string" && data.startsWith("0x")) return data;
@@ -79,28 +60,17 @@ export function useContract(signer) {
       throw new Error("Unsupported data type for toHex(): " + typeof data);
     };
   
-    // --- Utility: ensure hex string is exactly 32 bytes (64 hex chars) ---
     const toFixed32 = (hex) => {
       if (!hex.startsWith("0x")) throw new Error("Missing 0x prefix");
       const clean = hex.slice(2);
-      if (clean.length > 64) return "0x" + clean.slice(0, 64); // truncate
-      return "0x" + clean.padEnd(64, "0"); // pad to 32 bytes
+      if (clean.length > 64) return "0x" + clean.slice(0, 64);
+      return "0x" + clean.padEnd(64, "0");
     };
   
-    // Convert handle and proof to proper formats
     const handleHex = toFixed32(toHex(encrypted.handles[0]));
     const proofHex = toHex(encrypted.inputProof);
     const pollIdNum = BigInt(pollId);
   
-    console.log("🧾 Prepared vote payload:", {
-      pollIdNum,
-      handleHex,
-      proofHex,
-      handleLength: (handleHex.length - 2) / 2 + " bytes",
-      proofLength: (proofHex.length - 2) / 2 + " bytes",
-    });
-  
-    // --- Send transaction ---
     const tx = await contract.vote(pollIdNum, handleHex, proofHex);
     const receipt = await tx.wait();
   
@@ -108,10 +78,6 @@ export function useContract(signer) {
     return receipt;
   };
   
-  
-  /**
-   * Close poll (marks ciphertexts for public decryption)
-   */
   const closePoll = async (pollId) => {
     if (!contract) throw new Error('Contract not initialized');
     
@@ -124,9 +90,6 @@ export function useContract(signer) {
     return receipt;
   };
 
-  /**
-   * Delete poll (creator only)
-   */
   const deletePoll = async (pollId) => {
     if (!contract) throw new Error('Contract not initialized');
     
@@ -139,7 +102,6 @@ export function useContract(signer) {
       console.log('✅ Poll deleted successfully');
       return receipt;
     } catch (error) {
-      // If deletePoll doesn't exist on contract, provide helpful error
       if (error.message.includes('is not a function')) {
         throw new Error('Delete functionality not available in contract. Please contact developer.');
       }
@@ -147,9 +109,6 @@ export function useContract(signer) {
     }
   };
 
-  /**
-   * Get poll details
-   */
   const getPoll = async (pollId) => {
     if (!contract) {
       console.warn('⚠️ Contract not ready yet');
@@ -158,9 +117,6 @@ export function useContract(signer) {
     return await contract.getPoll(pollId);
   };
 
-  /**
-   * Check if user has voted
-   */
   const hasVoted = async (pollId, address) => {
     if (!contract) {
       console.warn('⚠️ Contract not ready yet');
@@ -169,9 +125,6 @@ export function useContract(signer) {
     return await contract.hasVoted(pollId, address);
   };
 
-  /**
-   * Get final results (after decryption)
-   */
   const getFinalResults = async (pollId) => {
     if (!contract) {
       console.warn('⚠️ Contract not ready yet');
@@ -180,9 +133,6 @@ export function useContract(signer) {
     return await contract.getFinalResults(pollId);
   };
 
-  /**
-   * ✅ NEW: Get ALL existing poll IDs (active + ended)
-   */
   const getAllPollIds = async () => {
     if (!contract) {
       console.warn('⚠️ Contract not ready yet');
@@ -191,9 +141,6 @@ export function useContract(signer) {
     return await contract.getAllPollIds();
   };
 
-  /**
-   * Get active (not expired) poll IDs only
-   */
   const getActivePollIds = async () => {
     if (!contract) {
       console.warn('⚠️ Contract not ready yet');
@@ -203,18 +150,10 @@ export function useContract(signer) {
   };
 
   /**
-   * FHEVM v0.9 Public Decryption & Submit Results Workflow
+   * FHEVM v0.9 Public Decryption - FINAL FIX
    * 
-   * STEPS:
-   * 1. Fetch encrypted vote count handles from contract
-   * 2. Call instance.publicDecrypt(handles) to get cleartext values
-   * 3. Format results as array
-   * 4. Submit cleartext + proof to contract
-   * 5. Contract verifies with FHE.checkSignatures()
-   * 
-   * @param {number} pollId - The poll ID
-   * @param {number} optionsCount - Number of options in the poll
-   * @returns {Promise<number[]>} - Array of decrypted vote counts
+   * KEY INSIGHT: SDK encodes euint32 as uint32, not uint256[]
+   * Contract must decode as individual uint32 values matching the tuple structure
    */
   const decryptAndSubmitResults = async (pollId, optionsCount) => {
     if (!contract) throw new Error('Contract not initialized');
@@ -224,7 +163,7 @@ export function useContract(signer) {
       console.log(`  → Poll ID: ${pollId}`);
       console.log(`  → Options count: ${optionsCount}`);
       
-      // STEP 1: Fetch encrypted handles from contract
+      // STEP 1: Fetch handles
       console.log('\n📡 Step 1: Fetching encrypted vote count handles...');
       const rawHandles = [];
       
@@ -235,45 +174,93 @@ export function useContract(signer) {
         console.log(`    ✓ Got handle: ${handle}`);
       }
       
-      // Extract and validate handles
       const handles = extractHandles(rawHandles);
       console.log('  ✓ All handles fetched and extracted');
+      console.log('  → Handle order:', handles.map((h, i) => `${i}: ${h.slice(0, 10)}...`));
       
       validateHandles(handles);
       console.log('  ✓ All handles validated');
       
-      // STEP 2: Decrypt using FHEVM SDK
-      console.log('\n🔐 Step 2: Decrypting via instance.publicDecrypt()...');
-      const decryptedValues = await decryptPollResults(handles);
+      // STEP 2: Decrypt via SDK
+      console.log('\n🔐 Step 2: Calling instance.publicDecrypt()...');
+      const decryptionResults = await decryptPollResults(handles);
       console.log('  ✓ Decryption successful');
+      console.log('  → Got clearValues:', Object.keys(decryptionResults.clearValues).length);
+      console.log('  → Got abiEncodedClearValues:', !!decryptionResults.abiEncodedClearValues);
+      console.log('  → Got decryptionProof:', !!decryptionResults.decryptionProof);
       
-      // STEP 3: Format results as ordered array
-      console.log('\n📊 Step 3: Formatting results...');
-      const resultsArray = formatDecryptedResults(decryptedValues, handles);
+      // STEP 3: Format for display
+      console.log('\n📊 Step 3: Formatting results for display...');
+      const resultsArray = formatDecryptedResults(decryptionResults.clearValues, handles);
       console.log('  ✓ Results formatted:', resultsArray);
       
-      // Calculate total votes
       const totalVotes = resultsArray.reduce((sum, count) => sum + count, 0);
       console.log(`  → Total votes: ${totalVotes}`);
       
-      // STEP 4: Submit results to contract
-      console.log('\n📤 Step 4: Submitting results to contract...');
+      // STEP 4: Verify SDK encoding
+      console.log('\n🔍 Step 4: Verifying SDK encoding...');
       
-      // IMPORTANT: For HTTP public decrypt via relayer, proof is handled differently
-      // The relayer already validated the decryption, so we pass empty proof
-      // The contract's FHE.checkSignatures() will verify via the KMS
-      const proof = '0x'; // Empty proof for relayer-based public decrypt
+      const abiEncodedResults = decryptionResults.abiEncodedClearValues;
+      const proof = decryptionResults.decryptionProof;
       
-      console.log('  → Calling submitResults()...');
-      const tx = await contract.submitResults(pollId, resultsArray, proof);
+      console.log('  → SDK abiEncodedClearValues length:', abiEncodedResults.length);
+      console.log('  → Proof length:', proof.length);
       
-      console.log('  → Waiting for transaction confirmation...');
+      // Decode as individual uint32 values to verify
+      const ethers = await import('ethers');
+      let decodedNumbers;
+      
+      try {
+        // Try decoding as tuple of uint32 values
+        if (optionsCount === 2) {
+          const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['uint32', 'uint32'], abiEncodedResults);
+          decodedNumbers = decoded.map(v => Number(v));
+        } else if (optionsCount === 3) {
+          const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['uint32', 'uint32', 'uint32'], abiEncodedResults);
+          decodedNumbers = decoded.map(v => Number(v));
+        } else if (optionsCount === 4) {
+          const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['uint32', 'uint32', 'uint32', 'uint32'], abiEncodedResults);
+          decodedNumbers = decoded.map(v => Number(v));
+        } else if (optionsCount === 5) {
+          const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['uint32', 'uint32', 'uint32', 'uint32', 'uint32'], abiEncodedResults);
+          decodedNumbers = decoded.map(v => Number(v));
+        }
+        
+        console.log('  → Decoded as uint32 tuple:', decodedNumbers);
+        
+        const matches = decodedNumbers.every((val, idx) => val === resultsArray[idx]);
+        console.log('  → Matches our formatted results:', matches);
+        
+        if (!matches) {
+          console.error('  ❌ Mismatch detected!');
+          console.error('    Decoded from SDK:', decodedNumbers);
+          console.error('    Our formatted:', resultsArray);
+          throw new Error('Result mismatch - possible ordering issue');
+        }
+      } catch (decodeError) {
+        console.error('  ❌ Failed to decode as uint32 tuple:', decodeError);
+        console.error('  → This suggests the SDK encoding format is different than expected');
+        throw new Error(`Decoding verification failed: ${decodeError.message}`);
+      }
+      
+      if (!proof || proof === '0x') {
+        throw new Error('Invalid decryption proof from SDK');
+      }
+      
+      console.log('\n📤 Step 5: Submitting to contract...');
+      console.log('  → Calling contract.submitResults()...');
+      console.log('    - Passing abiEncodedResults (uint32 tuple)');
+      console.log('    - Passing decryptionProof from SDK');
+      
+      const tx = await contract.submitResults(pollId, abiEncodedResults, proof);
+      
+      console.log('  → Waiting for confirmation...');
       const receipt = await tx.wait();
       
-      console.log('  ✓ Transaction confirmed');
+      console.log('  ✓ Transaction confirmed!');
       console.log(`  → Gas used: ${receipt.gasUsed.toString()}`);
       
-      console.log('\n✅ FHEVM v0.9 decryption workflow completed successfully!');
+      console.log('\n✅ FHEVM v0.9 workflow complete with signature verification!');
       console.log('📊 Final results:', resultsArray);
       
       return resultsArray;
@@ -281,13 +268,19 @@ export function useContract(signer) {
     } catch (error) {
       console.error('\n❌ Decryption workflow failed:', error);
       
-      // Provide detailed error context
       if (error.message.includes('Invalid handle')) {
-        throw new Error('Invalid ciphertext handles from contract. Ensure poll is closed.');
+        throw new Error('Invalid ciphertext handles. Ensure poll is closed.');
       } else if (error.message.includes('not initialized')) {
-        throw new Error('FHEVM SDK not initialized. Please refresh the page.');
+        throw new Error('FHEVM SDK not initialized. Please refresh.');
       } else if (error.message.includes('Failed to decrypt')) {
-        throw new Error('Decryption failed. Ensure ciphertexts are marked as publicly decryptable.');
+        throw new Error('Decryption failed. Ensure ciphertexts are publicly decryptable.');
+      } else if (error.message.includes('checkSignatures') || error.message.includes('0x6475522d')) {
+        console.error('\n🔍 Signature verification debug:');
+        console.error('  - Handle order mismatch OR');
+        console.error('  - Type mismatch (uint32 vs uint256)');
+        throw new Error('Signature verification failed. See console for details.');
+      } else if (error.message.includes('Invalid results length')) {
+        throw new Error('Type mismatch: Contract expects tuple of uint32, check decoding.');
       } else {
         throw new Error(`Decryption workflow failed: ${error.message}`);
       }
@@ -303,7 +296,7 @@ export function useContract(signer) {
     getPoll,
     hasVoted,
     getFinalResults,
-    getAllPollIds, // ✅ NEW
+    getAllPollIds,
     getActivePollIds,
     decryptAndSubmitResults
   };
