@@ -9,34 +9,24 @@ import { Vote, Plus, Search, Lock, Zap, Target, Filter, RefreshCw } from 'lucide
 
 /**
  * Home Page - Main landing page with filters and poll list
- * 
- * FEATURES:
- * - Beautiful hero section with FHE benefits
- * - Filter tabs: All / Active / Ended / My Polls
- * - Shows ALL polls (persistent across page reloads)
- * - Auto-refresh support
+ * ✅ MOBILE RESPONSIVE - Optimized for all screen sizes
  */
 export const Home = () => {
   const navigate = useNavigate();
   const { signer, account, isConnected } = useWalletContext();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'active' | 'ended' | 'my-polls'
+  const [filterMode, setFilterMode] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Fetch polls with current filter - NOW FETCHES ALL POLLS!
   const { polls, loading } = usePolls(signer, refreshTrigger, filterMode, account);
 
-  // Refresh polls handler
   const refreshPolls = () => {
     console.log('🔄 Triggering poll list refresh...');
     setIsRefreshing(true);
     setRefreshTrigger(prev => prev + 1);
-    
-    // Reset refreshing state after 1 second
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  // Check if we just came back from creating a poll
   useEffect(() => {
     const justCreated = sessionStorage.getItem('pollJustCreated');
     if (justCreated) {
@@ -46,7 +36,6 @@ export const Home = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Filter options configuration
   const filterOptions = [
     { 
       value: 'all', 
@@ -71,7 +60,6 @@ export const Home = () => {
     }
   ];
 
-  // Get empty message based on filter
   const getEmptyMessage = () => {
     switch (filterMode) {
       case 'active':
@@ -87,22 +75,22 @@ export const Home = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {/* Hero Section - Mobile Optimized */}
       <section className="bg-gradient-to-b from-primary/20 to-background border-b-2 border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <Vote size={80} className="mx-auto mb-6" />
-          <h1 className="font-head text-5xl md:text-6xl mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 text-center">
+          <Vote size={60} className="mx-auto mb-4 sm:mb-6 sm:w-20 sm:h-20" />
+          <h1 className="font-head text-3xl sm:text-4xl md:text-5xl lg:text-6xl mb-4 sm:mb-6 leading-tight">
             Vote in Secret.<br />Results in Public.
           </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-6 sm:mb-8 max-w-2xl mx-auto px-4">
             Create confidential polls using Zama's Fully Homomorphic Encryption technology. 
             Your votes stay private until results are revealed.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
             <Button
               size="lg"
               onClick={() => navigate('/create')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 justify-center w-full sm:w-auto"
             >
               <Plus size={20} />
               Create Poll
@@ -111,7 +99,7 @@ export const Home = () => {
               size="lg"
               variant="outline"
               onClick={() => document.getElementById('polls')?.scrollIntoView({ behavior: 'smooth' })}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 justify-center w-full sm:w-auto"
             >
               <Search size={20} />
               Browse Polls
@@ -120,64 +108,64 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Features Section - Mobile Grid */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 md:py-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
           {[
             {
-              icon: <Lock className="w-8 h-8 text-primary mb-3" />,
+              icon: <Lock className="w-6 h-6 sm:w-8 sm:h-8 text-primary mb-2 sm:mb-3" />,
               title: 'Fully Confidential',
               description: 'Individual votes are encrypted using FHE and remain private until reveal'
             },
             {
-              icon: <Zap className="w-8 h-8 text-primary mb-3" />,
+              icon: <Zap className="w-6 h-6 sm:w-8 sm:h-8 text-primary mb-2 sm:mb-3" />,
               title: 'No Intermediaries',
               description: 'All voting happens on-chain with no trusted third parties'
             },
             {
-              icon: <Target className="w-8 h-8 text-primary mb-3" />,
+              icon: <Target className="w-6 h-6 sm:w-8 sm:h-8 text-primary mb-2 sm:mb-3" />,
               title: 'Verifiable Results',
               description: 'Decryption proofs ensure results are authentic and tamper-proof'
             }
           ].map((feature, i) => (
             <div
               key={i}
-              className="bg-card border-2 border-border shadow-md p-6 hover:shadow-lg transition-shadow rounded-lg text-center"
+              className="bg-card border-2 border-border shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow rounded-lg text-center"
             >
               <div className="flex flex-col items-center">
                 {feature.icon}
-                <h3 className="font-head text-xl mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm">{feature.description}</p>
+                <h3 className="font-head text-lg sm:text-xl mb-1 sm:mb-2">{feature.title}</h3>
+                <p className="text-muted-foreground text-xs sm:text-sm">{feature.description}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Active Polls Section with Filters */}
-      <section id="polls" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Header with Create Button */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+      {/* Active Polls Section with Filters - Mobile Optimized */}
+      <section id="polls" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 md:py-16">
+        {/* Header with Create Button - Stacked on Mobile */}
+        <div className="flex flex-col gap-4 mb-6 sm:mb-8">
           <div>
-            <h2 className="font-head text-3xl mb-2">Browse Polls</h2>
-            <p className="text-muted-foreground text-sm">
+            <h2 className="font-head text-2xl sm:text-3xl mb-2">Browse Polls</h2>
+            <p className="text-muted-foreground text-xs sm:text-sm">
               All polls are stored permanently on the blockchain
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={refreshPolls}
               disabled={isRefreshing}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 justify-center w-full sm:w-auto"
             >
               <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              <span className="sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </Button>
             <Button
               onClick={() => navigate('/create')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 justify-center w-full sm:w-auto"
             >
               <Plus size={18} />
               Create New Poll
@@ -185,15 +173,14 @@ export const Home = () => {
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="bg-card border-2 border-border shadow-md rounded-lg p-4 mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter size={16} className="text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Filter Polls:</span>
+        {/* Filter Tabs - Mobile Scrollable */}
+        <div className="bg-card border-2 border-border shadow-md rounded-lg p-3 sm:p-4 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <Filter size={16} className="text-muted-foreground flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-medium text-muted-foreground">Filter Polls:</span>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap -mx-3 px-3 sm:mx-0 sm:px-0">
             {filterOptions.map((option) => {
-              // Hide "My Polls" if not connected
               if (option.requiresAuth && !isConnected) return null;
 
               const isActive = filterMode === option.value;
@@ -204,7 +191,7 @@ export const Home = () => {
                   variant={isActive ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setFilterMode(option.value)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 whitespace-nowrap flex-shrink-0"
                   title={option.description}
                 >
                   {option.label}
@@ -232,10 +219,6 @@ export const Home = () => {
           loading={loading}
           emptyMessage={getEmptyMessage()}
         />
-
-       
-
-        
       </section>
     </div>
   );

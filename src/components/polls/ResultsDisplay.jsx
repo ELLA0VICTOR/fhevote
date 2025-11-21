@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// FIX: Updated relative imports to match the structure in PollDetail.jsx
 import { Card, CardHeader, CardTitle, CardContent } from '../retroui/Card';
 import { Button } from '../retroui/Button';
 import { Badge } from '../retroui/Badge';
@@ -10,32 +9,24 @@ import { toast } from 'sonner';
 import { Lock, Unlock, TrendingUp } from 'lucide-react';
 
 /**
- * ✅ UPDATED: Results Display now uses the external isDecrypting prop for controlled state.
- * FIX: Corrected component import paths.
+ * ✅ MOBILE RESPONSIVE - Results Display optimized for mobile screens
  */
 export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], isDecrypting }) => {
-  // Removed internal isDecrypting state as it's now controlled by the parent (PollDetail.jsx)
   const [liveVoteCount, setLiveVoteCount] = useState(0);
 
-  // Count votes from events
   useEffect(() => {
     if (voteEvents && Array.isArray(voteEvents)) {
       setLiveVoteCount(voteEvents.length);
     }
   }, [voteEvents]);
 
-  // Use the external isDecrypting prop to control the UI logic
   const handleDecrypt = async () => {
-    // No need to set internal state, the parent handles the UI state change
     const toastId = toast.loading('Decrypting results...');
 
     try {
-      // The parent component (PollDetail) now handles the toast success/error on completion
       await onDecrypt();
       toast.success('Results revealed!', { id: toastId });
     } catch (error) {
-      // Note: PollDetail.jsx already handles complex error messages, 
-      // so this catch block can be simplified here.
       console.error('Decryption failed at ResultsDisplay:', error);
       toast.error('Decryption failed. Check console for details.', { id: toastId });
     }
@@ -44,9 +35,7 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
   const isPollEnded = Date.now() / 1000 >= poll.endTime;
   const hasResults = poll.finalResults && poll.finalResults.length > 0;
 
-  // ========================================
-  // CASE 1: Final Decrypted Results
-  // ========================================
+  // CASE 1: Final Decrypted Results - Mobile Optimized
   if (hasResults) {
     const chartData = poll.options.map((option, index) => ({
       name: option,
@@ -61,33 +50,38 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
 
     return (
       <Card className="lg:col-span-2">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Unlock size={24} />
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl md:text-2xl">
+              <Unlock size={20} className="sm:w-6 sm:h-6 flex-shrink-0" />
               Final Results
             </CardTitle>
-            <Badge variant="default">Decrypted</Badge>
+            <Badge variant="default" className="text-xs sm:text-sm">Decrypted</Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-muted-foreground">
+        <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <p className="text-muted-foreground text-sm sm:text-base">
               Total votes: <strong className="text-foreground">{totalVotes}</strong>
             </p>
             {winnerIndices.length === 1 && totalVotes > 0 && (
-              <Badge variant="default" className="text-sm">
+              <Badge variant="default" className="text-xs sm:text-sm">
                 Winner: {poll.options[winnerIndices[0]]}
               </Badge>
             )}
           </div>
           
-          <BarChart
-            data={chartData}
-            index="name"
-            categories={["votes"]}
-            fillColors={["var(--primary)"]}
-          />
+          {/* Chart - Scrollable on small screens */}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="min-w-[300px]">
+              <BarChart
+                data={chartData}
+                index="name"
+                categories={["votes"]}
+                fillColors={["var(--primary)"]}
+              />
+            </div>
+          </div>
 
           {/* Individual results with progress bars */}
           <div className="space-y-3">
@@ -98,11 +92,11 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
               
               return (
                 <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{option}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold">{voteCount}</span>
-                      <span className="text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm sm:text-base truncate flex-1">{option}</span>
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                      <span className="text-base sm:text-lg font-bold">{voteCount}</span>
+                      <span className="text-xs sm:text-sm text-muted-foreground">
                         ({percentage.toFixed(1)}%)
                       </span>
                     </div>
@@ -110,7 +104,7 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
                   <Progress 
                     value={percentage} 
                     max={100} 
-                    className={`h-3 ${isWinner ? 'border-primary' : ''}`}
+                    className={`h-2.5 sm:h-3 ${isWinner ? 'border-primary' : ''}`}
                   />
                 </div>
               );
@@ -121,39 +115,37 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
     );
   }
 
-  // ========================================
   // CASE 2: Poll Ended - Waiting for Decryption
-  // ========================================
   if (!poll.isActive) {
     if (isCreator) {
       return (
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock size={24} />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Lock size={20} className="sm:w-6 sm:h-6 flex-shrink-0" />
               Encrypted Results
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-accent p-4 rounded-lg border-2 border-border">
-              <p className="font-medium mb-2">Results are encrypted</p>
-              <p className="text-sm text-muted-foreground">
+          <CardContent className="p-4 sm:p-6 space-y-4">
+            <div className="bg-accent p-3 sm:p-4 rounded-lg border-2 border-border">
+              <p className="font-medium mb-2 text-sm sm:text-base">Results are encrypted</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {liveVoteCount} {liveVoteCount === 1 ? 'vote' : 'votes'} cast during this poll
               </p>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-xs sm:text-sm">
               Poll has ended. Click below to decrypt and reveal the final results.
             </p>
-            {/* ⚠️ Use external isDecrypting prop here ⚠️ */}
             <Button
               onClick={handleDecrypt}
               disabled={isDecrypting}
-              className="w-full"
+              className="w-full text-sm sm:text-base"
             >
               {isDecrypting ? (
                 <>
                   <LoadingSpinner size={16} className="mr-2" />
-                  Decryption Proof Generating...
+                  <span className="hidden sm:inline">Decryption Proof Generating...</span>
+                  <span className="sm:hidden">Generating Proof...</span>
                 </>
               ) : (
                 <>
@@ -169,13 +161,13 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
 
     return (
       <Card className="bg-muted lg:col-span-2">
-        <CardContent className="p-6 text-center space-y-3">
-          <Lock size={32} className="mx-auto" />
-          <p className="font-medium">Results are encrypted</p>
-          <p className="text-sm text-muted-foreground">
+        <CardContent className="p-4 sm:p-6 text-center space-y-3">
+          <Lock size={28} className="sm:w-8 sm:h-8 mx-auto" />
+          <p className="font-medium text-sm sm:text-base">Results are encrypted</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {liveVoteCount} {liveVoteCount === 1 ? 'vote' : 'votes'} cast
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Waiting for poll creator to decrypt results
           </p>
         </CardContent>
@@ -183,18 +175,16 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
     );
   }
 
-  // ========================================
   // CASE 3: Poll Ended but Not Closed Yet
-  // ========================================
   if (isPollEnded && poll.isActive) {
     return (
       <Card className="bg-accent lg:col-span-2">
-        <CardContent className="p-6 text-center space-y-3">
-          <p className="font-medium">Poll has ended</p>
-          <p className="text-sm text-muted-foreground">
+        <CardContent className="p-4 sm:p-6 text-center space-y-3">
+          <p className="font-medium text-sm sm:text-base">Poll has ended</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {liveVoteCount} {liveVoteCount === 1 ? 'vote' : 'votes'} cast
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Waiting for creator to close poll
           </p>
         </CardContent>
@@ -202,34 +192,32 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
     );
   }
 
-  // ========================================
-  // CASE 4: LIVE VOTING with Real Vote Progress
-  // ========================================
+  // CASE 4: LIVE VOTING - Mobile Optimized
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-4 sm:p-6">
         <div className="flex items-center justify-between">
-          <CardTitle>Live Voting</CardTitle>
-          <Badge variant="default">Active</Badge>
+          <CardTitle className="text-lg sm:text-xl">Live Voting</CardTitle>
+          <Badge variant="default" className="text-xs sm:text-sm">Active</Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* ✅ Enhanced Vote Count Display */}
-        <div className="bg-accent p-4 rounded-lg border-2 border-border text-center">
+      <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+        {/* Vote Count Display - Mobile Friendly */}
+        <div className="bg-accent p-3 sm:p-4 rounded-lg border-2 border-border text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <TrendingUp size={20} className="text-primary" />
-            <p className="text-3xl font-bold">{liveVoteCount}</p>
+            <TrendingUp size={18} className="sm:w-5 sm:h-5 text-primary" />
+            <p className="text-2xl sm:text-3xl font-bold">{liveVoteCount}</p>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {liveVoteCount === 1 ? 'vote' : 'votes'} cast so far
           </p>
         </div>
 
-        {/* ✅ FIXED: Vote Progress Bars show actual participation */}
+        {/* Vote Progress Bars */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium flex items-center gap-2">
-              <Lock size={16} />
+            <p className="text-xs sm:text-sm font-medium flex items-center gap-2">
+              <Lock size={14} className="sm:w-4 sm:h-4 flex-shrink-0" />
               Vote Participation
             </p>
             <span className="text-xs text-muted-foreground">
@@ -239,26 +227,23 @@ export const ResultsDisplay = ({ poll, isCreator, onDecrypt, voteEvents = [], is
           
           <div className="space-y-3">
             {poll.options.map((option, index) => {
-              // Calculate estimated participation per option
-              // Each option gets equal visual weight since votes are encrypted
               const estimatedProgress = liveVoteCount > 0 
-                ? Math.min((liveVoteCount / poll.options.length) * 20, 100) // Cap at 100%
+                ? Math.min((liveVoteCount / poll.options.length) * 20, 100)
                 : 0;
               
               return (
                 <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{option}</span>
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Lock size={12} />
-                      Encrypted
+                  <div className="flex items-center justify-between text-xs sm:text-sm gap-2">
+                    <span className="font-medium truncate flex-1">{option}</span>
+                    <span className="text-muted-foreground flex items-center gap-1 flex-shrink-0">
+                      <Lock size={10} className="sm:w-3 sm:h-3" />
+                      <span className="hidden xs:inline">Encrypted</span>
                     </span>
                   </div>
-                  {/* ✅ Progress now reflects voting activity */}
                   <Progress 
                     value={estimatedProgress} 
                     max={100} 
-                    className="h-3"
+                    className="h-2.5 sm:h-3"
                   />
                 </div>
               );

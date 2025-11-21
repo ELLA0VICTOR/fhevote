@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Clock, User, Trash2, RefreshCw } from 'lucide-react';
 
 /**
- * ✅ FIXED: Poll Detail Component with proper post-decryption refresh
+ * ✅ MOBILE RESPONSIVE - Poll Detail Page optimized for all screen sizes
  */
 export const PollDetail = () => {
   const { id } = useParams();
@@ -31,7 +31,6 @@ export const PollDetail = () => {
   const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
   const [isDecrypting, setIsDecrypting] = useState(false);
 
-  // Update current time every second for live timer
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Math.floor(Date.now() / 1000));
@@ -62,7 +61,6 @@ export const PollDetail = () => {
       
       const voted = account ? await hasVoted(id, account) : false;
       
-      // ✅ FIX: Fetch final results from contract
       let finalResults = [];
       try {
         const results = await getFinalResults(id);
@@ -87,7 +85,6 @@ export const PollDetail = () => {
       setPoll(pollState);
       setUserHasVoted(voted);
       
-      // Fetch vote events for live tracking
       try {
         const filter = contract.filters.VoteCast(id);
         const events = await contract.queryFilter(filter);
@@ -243,14 +240,12 @@ export const PollDetail = () => {
         duration: 5000
       });
       
-      // ✅ CRITICAL FIX: Refresh poll data immediately to show results
       console.log('🔄 Refreshing poll data to display results...');
-      await fetchPollData(); // Direct call instead of using refreshKey
+      await fetchPollData();
       
     } catch (error) {
       console.error('❌ Decryption failed:', error);
       
-      // Provide user-friendly error messages
       let errorMessage = 'Failed to decrypt results';
       
       if (error.message.includes('not initialized')) {
@@ -274,9 +269,9 @@ export const PollDetail = () => {
 
   if (loading || !contract) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">
         <LoadingSpinner size={40} />
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground text-center">
           {!contract ? 'Initializing contract...' : 'Loading poll...'}
         </p>
       </div>
@@ -285,11 +280,11 @@ export const PollDetail = () => {
 
   if (!poll) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Poll not found</p>
-            <Button onClick={() => navigate('/')} className="mt-4">
+            <Button onClick={() => navigate('/')} className="mt-4 w-full sm:w-auto">
               Back to Home
             </Button>
           </CardContent>
@@ -301,9 +296,6 @@ export const PollDetail = () => {
   const isPollExpired = currentTime >= poll.endTime;
   const isCreator = account && account.toLowerCase() === poll.creator.toLowerCase();
 
-  /**
-   * ✅ FIXED: Clean timer calculation with NO console spam
-   */
   const timeRemaining = () => {
     const diff = poll.endTime - currentTime;
 
@@ -321,15 +313,17 @@ export const PollDetail = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 md:py-12">
+      {/* Mobile-optimized header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <Button
           variant="ghost"
           onClick={() => navigate('/')}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 -ml-2 sm:ml-0"
+          size="sm"
         >
           <ArrowLeft size={16} />
-          Back to Polls
+          <span className="text-sm sm:text-base">Back</span>
         </Button>
 
         {poll.isActive && !isPollExpired && (
@@ -338,7 +332,7 @@ export const PollDetail = () => {
             size="sm"
             onClick={handleManualRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 w-full sm:w-auto"
           >
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
             {isRefreshing ? 'Refreshing...' : 'Refresh'}
@@ -346,17 +340,20 @@ export const PollDetail = () => {
         )}
       </div>
 
-      <Card className="mb-8">
-        <CardHeader>
-          <div className="flex justify-between items-start gap-4 flex-wrap">
+      {/* Poll Info Card - Mobile Optimized */}
+      <Card className="mb-6 sm:mb-8">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:gap-4">
             <div className="flex-1">
-              <CardTitle className="text-3xl mb-2">{poll.question}</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <User size={16} />
-                {poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}
+              <CardTitle className="text-xl sm:text-2xl md:text-3xl mb-2 pr-2 break-words">
+                {poll.question}
+              </CardTitle>
+              <CardDescription className="flex items-center gap-2 text-xs sm:text-sm">
+                <User size={14} className="sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="truncate">{poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}</span>
               </CardDescription>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               <Badge variant={poll.isActive && !isPollExpired ? 'default' : 'secondary'}>
                 {poll.isActive && !isPollExpired ? 'Active' : 'Ended'}
               </Badge>
@@ -366,35 +363,36 @@ export const PollDetail = () => {
                   variant="destructive"
                   size="sm"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 text-xs sm:text-sm"
                 >
-                  <Trash2 size={16} />
-                  Delete
+                  <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                  <span className="hidden xs:inline">Delete</span>
                 </Button>
               )}
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock size={16} />
+        <CardContent className="p-4 sm:p-6 pt-0">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
+            <Clock size={14} className="sm:w-4 sm:h-4 flex-shrink-0" />
             <span>{timeRemaining()}</span>
           </div>
         </CardContent>
       </Card>
 
+      {/* Delete Confirmation - Mobile Friendly */}
       {showDeleteConfirm && (
-        <Card className="mb-8 border-destructive">
-          <CardContent className="p-6">
-            <h3 className="font-head text-xl mb-2">Delete Poll?</h3>
-            <p className="text-muted-foreground mb-4">
+        <Card className="mb-6 sm:mb-8 border-destructive">
+          <CardContent className="p-4 sm:p-6">
+            <h3 className="font-head text-lg sm:text-xl mb-2">Delete Poll?</h3>
+            <p className="text-muted-foreground text-sm mb-4">
               This action cannot be undone. All votes will be permanently deleted.
             </p>
-            <div className="flex gap-3">
-              <Button variant="destructive" onClick={handleDeletePoll}>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <Button variant="destructive" onClick={handleDeletePoll} className="w-full sm:w-auto">
                 Yes, Delete Poll
               </Button>
-              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
             </div>
@@ -402,7 +400,8 @@ export const PollDetail = () => {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Main Content Grid - Mobile Stacked, Desktop Side-by-Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
         {poll.isActive && !isPollExpired && (
           <VoteModal
             poll={poll}
@@ -414,8 +413,10 @@ export const PollDetail = () => {
 
         {isCreator && isPollExpired && poll.isActive && (
           <Card className="bg-accent lg:col-span-2">
-            <CardContent className="p-6">
-              <p className="font-medium mb-4">Poll has ended - Close to prepare for decryption</p>
+            <CardContent className="p-4 sm:p-6">
+              <p className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">
+                Poll has ended - Close to prepare for decryption
+              </p>
               <Button onClick={handleClosePoll} className="w-full">
                 Close Poll & Mark for Decryption
               </Button>

@@ -4,6 +4,9 @@ import { RadioGroup } from '../retroui/Radio';
 import { Button } from '../retroui/Button';
 import { toast } from '../retroui/Sonner';
 
+/**
+ * ✅ MOBILE RESPONSIVE - Vote Modal optimized for mobile touch
+ */
 export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [isVoting, setIsVoting] = useState(false);
@@ -14,7 +17,6 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
       return;
     }
 
-    // CRITICAL: Double-check poll hasn't expired before submitting
     const now = Date.now() / 1000;
     if (now >= poll.endTime) {
       toast.error('This poll has ended while you were voting');
@@ -40,16 +42,15 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
     }
   };
 
-  // Check both isActive flag AND time-based expiry
   const now = Date.now() / 1000;
   const isPollExpired = now >= poll.endTime;
 
   if (hasVoted) {
     return (
       <Card className="bg-accent">
-        <CardContent className="p-6 text-center">
-          <p className="font-medium">✓ You've already voted in this poll</p>
-          <p className="text-sm text-muted-foreground mt-2">
+        <CardContent className="p-4 sm:p-6 text-center">
+          <p className="font-medium text-sm sm:text-base">✓ You've already voted in this poll</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
             Results will be revealed when the poll closes
           </p>
         </CardContent>
@@ -60,9 +61,9 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
   if (isPollExpired || !poll.isActive) {
     return (
       <Card className="bg-muted">
-        <CardContent className="p-6 text-center">
-          <p className="font-medium">This poll has ended</p>
-          <p className="text-sm text-muted-foreground mt-2">
+        <CardContent className="p-4 sm:p-6 text-center">
+          <p className="font-medium text-sm sm:text-base">This poll has ended</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
             {poll.isActive 
               ? 'Waiting for creator to close and reveal results'
               : 'Waiting for results decryption'}
@@ -74,10 +75,10 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Cast Your Vote</CardTitle>
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="text-lg sm:text-xl">Cast Your Vote</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6 pt-0">
         <RadioGroup value={selectedOption?.toString()}>
           {poll.options.map((option, index) => (
             <RadioGroup.Item
@@ -89,20 +90,21 @@ export const VoteModal = ({ poll, onVote, hasVoted, account }) => {
               checked={selectedOption === index}
               onChange={() => setSelectedOption(index)}
               disabled={isVoting}
+              className="text-sm sm:text-base"
             />
           ))}
         </RadioGroup>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="p-4 sm:p-6 pt-0 flex-col gap-2">
         <Button
           onClick={handleVote}
           disabled={selectedOption === null || isVoting || !account}
-          className="w-full"
+          className="w-full text-sm sm:text-base"
         >
           {isVoting ? 'Casting Vote...' : 'Cast Vote'}
         </Button>
         {!account && (
-          <p className="text-sm text-muted-foreground text-center w-full mt-2">
+          <p className="text-xs sm:text-sm text-muted-foreground text-center w-full">
             Please connect your wallet to vote
           </p>
         )}

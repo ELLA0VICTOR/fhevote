@@ -146,8 +146,5 @@ MIT License - see LICENSE file
 This project demonstrates production-ready use of Zama's FHEVM v0.9 for confidential on-chain voting.
 
 ## 🔗 Links
-
-- [Zama Documentation](https://docs.zama.ai)
-- [FHEVM Docs](https://docs.zama.ai/fhevm)
-- [Demo Video](YOUR_VIDEO_LINK)
-- [Live Demo](YOUR_VERCEL_URL)
+- [Demo Video]:https://youtu.be/WCfWREt0Ftc
+- [Live Demo]:https://fhevote-ten.vercel.app/

@@ -10,6 +10,9 @@ import { Button } from '../retroui/Button';
 import { toast } from '../retroui/Sonner';
 import { Plus, Trash2, Clock } from 'lucide-react';
 
+/**
+ * ✅ MOBILE RESPONSIVE - Create Poll Form optimized for mobile devices
+ */
 export const CreatePollForm = () => {
   const navigate = useNavigate();
   const { signer, isConnected } = useWalletContext();
@@ -41,12 +44,8 @@ export const CreatePollForm = () => {
     setOptions(newOptions);
   };
 
-  /**
-   * ✅ FIXED: Calculate total duration in minutes with explicit number conversion
-   */
   const calculateDurationMinutes = () => {
     if (durationType === 'preset') {
-      // Ensure we return a clean integer
       return parseInt(presetDuration, 10);
     } else {
       const value = parseInt(customValue, 10);
@@ -97,7 +96,6 @@ export const CreatePollForm = () => {
     const toastId = toast.loading('Creating poll...');
 
     try {
-      // ✅ CRITICAL FIX: Explicit logging to diagnose duration issues
       console.log('📝 Creating poll with explicit duration:', {
         durationMinutes,
         durationType,
@@ -108,7 +106,6 @@ export const CreatePollForm = () => {
         willExpireAt: `${Math.floor(Date.now() / 1000)} + ${durationMinutes * 60} seconds`
       });
       
-      // Ensure we're passing a clean integer to the contract
       const cleanDuration = Math.floor(durationMinutes);
       
       console.log('  → Sending to contract:', cleanDuration, 'minutes');
@@ -129,26 +126,27 @@ export const CreatePollForm = () => {
 
   return (
     <Card className="max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Create New Poll</CardTitle>
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="text-xl sm:text-2xl">Create New Poll</CardTitle>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <CardContent className="p-4 sm:p-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Question Input */}
           <div>
-            <Label htmlFor="question">Poll Question</Label>
+            <Label htmlFor="question" className="text-sm sm:text-base">Poll Question</Label>
             <Input
               id="question"
               placeholder="What's your favorite programming language?"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               disabled={isSubmitting}
+              className="text-sm sm:text-base"
             />
           </div>
 
-          {/* Options */}
-          <div className="space-y-4">
-            <Label>Options</Label>
+          {/* Options - Mobile Optimized */}
+          <div className="space-y-3 sm:space-y-4">
+            <Label className="text-sm sm:text-base">Options</Label>
             {options.map((option, index) => (
               <div key={index} className="flex gap-2">
                 <Input
@@ -156,6 +154,7 @@ export const CreatePollForm = () => {
                   value={option}
                   onChange={(e) => updateOption(index, e.target.value)}
                   disabled={isSubmitting}
+                  className="text-sm sm:text-base"
                 />
                 {options.length > 2 && (
                   <Button
@@ -164,6 +163,7 @@ export const CreatePollForm = () => {
                     size="icon"
                     onClick={() => removeOption(index)}
                     disabled={isSubmitting}
+                    className="flex-shrink-0"
                   >
                     <Trash2 size={16} />
                   </Button>
@@ -176,7 +176,7 @@ export const CreatePollForm = () => {
                 variant="outline"
                 onClick={addOption}
                 disabled={isSubmitting}
-                className="w-full flex items-center gap-2 justify-center"
+                className="w-full flex items-center gap-2 justify-center text-sm sm:text-base"
               >
                 <Plus size={16} />
                 Add Option
@@ -184,32 +184,32 @@ export const CreatePollForm = () => {
             )}
           </div>
 
-          {/* Duration Selector */}
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2">
+          {/* Duration Selector - Mobile Optimized */}
+          <div className="space-y-3 sm:space-y-4">
+            <Label className="flex items-center gap-2 text-sm sm:text-base">
               <Clock size={16} />
               Poll Duration
             </Label>
             
-            {/* Duration Type Toggle */}
-            <div className="flex gap-2">
+            {/* Duration Type Toggle - Mobile Stacked */}
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
                 variant={durationType === 'preset' ? 'default' : 'outline'}
                 onClick={() => setDurationType('preset')}
                 disabled={isSubmitting}
-                className="flex-1"
+                className="text-xs sm:text-sm"
               >
-                Preset Duration
+                Preset
               </Button>
               <Button
                 type="button"
                 variant={durationType === 'custom' ? 'default' : 'outline'}
                 onClick={() => setDurationType('custom')}
                 disabled={isSubmitting}
-                className="flex-1"
+                className="text-xs sm:text-sm"
               >
-                Custom Duration
+                Custom
               </Button>
             </div>
 
@@ -220,6 +220,7 @@ export const CreatePollForm = () => {
                 value={presetDuration}
                 onChange={(e) => setPresetDuration(e.target.value)}
                 disabled={isSubmitting}
+                className="text-sm sm:text-base"
               >
                 <option value="1">1 minute (Demo)</option>
                 <option value="5">5 minutes (Quick Test)</option>
@@ -230,9 +231,9 @@ export const CreatePollForm = () => {
               </Select>
             )}
 
-            {/* Custom Duration Input */}
+            {/* Custom Duration Input - Mobile Optimized */}
             {durationType === 'custom' && (
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   type="number"
                   min="1"
@@ -240,13 +241,13 @@ export const CreatePollForm = () => {
                   value={customValue}
                   onChange={(e) => setCustomValue(e.target.value)}
                   disabled={isSubmitting}
-                  className="flex-1"
+                  className="flex-1 text-sm sm:text-base"
                 />
                 <Select
                   value={customUnit}
                   onChange={(e) => setCustomUnit(e.target.value)}
                   disabled={isSubmitting}
-                  className="w-32"
+                  className="w-full sm:w-32 text-sm sm:text-base"
                 >
                   <option value="minutes">Minutes</option>
                   <option value="hours">Hours</option>
@@ -254,8 +255,8 @@ export const CreatePollForm = () => {
               </div>
             )}
 
-            {/* Duration Preview */}
-            <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
+            {/* Duration Preview - Mobile Friendly */}
+            <div className="text-xs sm:text-sm text-muted-foreground bg-muted p-3 rounded-lg">
               <strong>Duration:</strong> {calculateDurationMinutes()} minutes
               {calculateDurationMinutes() >= 60 && (
                 <span> ({(calculateDurationMinutes() / 60).toFixed(1)} hours)</span>
@@ -266,7 +267,7 @@ export const CreatePollForm = () => {
           {/* Submit Button */}
           <Button
             type="submit"
-            className="w-full"
+            className="w-full text-sm sm:text-base"
             disabled={isSubmitting || !isConnected}
           >
             {isSubmitting ? 'Creating...' : 'Create Poll'}
