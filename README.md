@@ -32,7 +32,7 @@ You'll need:
 
 - Node.js v18 or higher
 - MetaMask browser extension
-- Sepolia testnet ETH (available from [Sepolia Faucet](https://sepoliafaucet.com))
+- Sepolia testnet ETH (available from [Sepolia Faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia))
 
 ### Installation
 
@@ -201,7 +201,7 @@ Switch MetaMask to Sepolia testnet. If you don't see Sepolia:
 
 ### "Insufficient funds"
 
-Obtain free Sepolia ETH from [https://sepoliafaucet.com](https://sepoliafaucet.com)
+Obtain free Sepolia ETH from [https://sepoliafaucet.com](https://cloud.google.com/application/web3/faucet/ethereum/sepolia)
 
 ### Decryption Fails
 
@@ -244,7 +244,7 @@ Contributions are welcome. Please open an issue to discuss proposed changes befo
 - [Zama FHEVM Documentation](https://docs.zama.ai/fhevm)
 - [Hardhat Documentation](https://hardhat.org/docs)
 - [Ethers.js v6 Documentation](https://docs.ethers.org/v6/)
-- [Sepolia Faucet](https://sepoliafaucet.com)
+- [Sepolia Faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia)
 
 ## License
 
