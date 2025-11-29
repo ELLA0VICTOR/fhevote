@@ -136,10 +136,11 @@ export async function initFhevm() {
     // Step 2: Create instance with Sepolia v0.9 config
     console.log('  → Creating FHEVM instance with v0.9 config...');
     
+    // FIXED: Don't pass window.ethereum during init - SDK will handle it later
+    // This prevents WASM initialization issues in Chrome
     const config = {
       ...SEPOLIA_V09_CONFIG,
-      // Use MetaMask provider if available, otherwise fallback to public RPC
-      network: window.ethereum || 'https://sepolia.infura.io/v3/d05efcb7210a474e8b98308181a49685',
+      network: 'https://sepolia.infura.io/v3/d05efcb7210a474e8b98308181a49685',
     };
     
     console.log('  → Config:', {
@@ -149,7 +150,16 @@ export async function initFhevm() {
       hasMetaMask: !!window.ethereum
     });
     
-    fhevmInstance = await window.relayerSDK.createInstance(config);
+    // FIXED: Add retry logic for transient WASM initialization failures
+    try {
+      fhevmInstance = await window.relayerSDK.createInstance(config);
+    } catch (error) {
+      console.warn('Failed to create instance, retrying...', error);
+      // Retry once after 1 second delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      fhevmInstance = await window.relayerSDK.createInstance(config);
+    }
+    
     isInitialized = true;
     
     console.log('  ✓ FHEVM instance created successfully');

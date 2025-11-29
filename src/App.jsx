@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from './components/retroui/Sonner';
 import { WalletProvider } from './context/WalletContext';
@@ -21,8 +21,15 @@ import { LoadingSpinner } from './components/retroui/common/LoadingSpinner';
 function App() {
   const [fhevmReady, setFhevmReady] = useState(false);
   const [initError, setInitError] = useState(null);
+  const initializingRef = useRef(false);
 
   useEffect(() => {
+    // Prevent double initialization in React Strict Mode
+    if (initializingRef.current) {
+      return;
+    }
+    initializingRef.current = true;
+
     const initialize = async () => {
       try {
         console.log('🚀 Initializing FHEVM SDK...');
@@ -31,7 +38,17 @@ function App() {
         console.log('✅ FHEVM SDK ready - App can now render');
       } catch (error) {
         console.error('❌ FHEVM initialization failed:', error);
-        setInitError(error.message);
+        // Only show error if it's a real failure (not a transient WASM issue)
+        // The retry logic in fhevm.js should handle most cases
+        if (error.message && !error.message.includes('unwrap_throw')) {
+          setInitError(error.message);
+        } else {
+          // For WASM errors, wait a bit and retry
+          console.log('⚠️ Transient WASM error, retrying...');
+          setTimeout(() => {
+            initialize();
+          }, 1500);
+        }
       }
     };
 
